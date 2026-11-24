@@ -1,0 +1,37 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="Beacon"
+           Manufacturer="Beacon"
+           Version="1.6.0"
+           UpgradeCode="{E8F3C2A1-4D5B-4C7E-9A11-6B2D8F0C7E33}"
+           Language="1033"
+           Codepage="1252"
+           InstallerVersion="200"
+           Compressed="yes">
+
+    <MajorUpgrade AllowSameVersionUpgrades="yes"
+                  DowngradeErrorMessage="A newer version of Beacon is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Feature Id="BeaconFeature" Title="Beacon" Level="1">
+      <ComponentGroupRef Id="BeaconFiles" />
+      <ComponentRef Id="StartMenuShortcut" />
+    </Feature>
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="Beacon" />
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder" />
+
+    <Icon Id="BeaconIcon" SourceFile="src\Beacon\Assets\beacon.ico" />
+
+    <Component Id="StartMenuShortcut" Guid="{2A8C6E14-9B37-4D21-A6E2-5F3C1D9B7A44}" Directory="ProgramMenuFolder">
+      <Shortcut Id="BeaconShortcut"
+                Name="Beacon"
+                Description="Send full-screen popups over HTTP"
+                Target="[INSTALLFOLDER]Beacon.exe"
+                WorkingDirectory="INSTALLFOLDER"
+                Icon="BeaconIcon" />
+      <RegistryValue Root="HKCU" Key="Software\Beacon" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+  </Package>
+</Wix>

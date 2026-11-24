@@ -1,0 +1,44 @@
+# Build outputs
+bin/
+obj/
+publish/
+*.dll
+*.exe
+*.pdb
+*.deps.json
+*.runtimeconfig.json
+
+# Local toolchain (downloaded .NET SDK / WiX)
+.tools/
+
+# Installer artifacts (build locally with tools/build_installer.ps1)
+*.msi
+*.msix
+*.wixpdb
+*.cab
+
+# Visual Studio / Rider / editor files
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# OS / temp files
+Thumbs.db
+Desktop.ini
+*.tmp
+*.log
+screenshot.png
+
+# Local runtime secrets and machine-specific docs
+settings.json
+.beacon-token
+beacon-token
+MUSE_PROMPT.local.md
+
+# Python caches
+__pycache__/
+*.pyc

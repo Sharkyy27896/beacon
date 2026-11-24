@@ -1,0 +1,272 @@
+<div align="center">
+
+# Beacon
+
+**Turn an HTTP request into a big, beautiful, full-screen Windows popup.**
+
+![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?style=flat-square&logo=windows)
+![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square&logo=dotnet)
+![Version](https://img.shields.io/badge/version-1.6.0-2EA043?style=flat-square)
+![License](https://img.shields.io/badge/license-MIT-0969DA?style=flat-square&logo=git)
+![Visibility](https://img.shields.io/badge/repo-private-6E7781?style=flat-square&logo=github)
+
+</div>
+
+Beacon is a tiny tray app that lets an AI agent (or any script) ask for your
+attention without assuming you are watching the screen. It listens for
+token-authenticated HTTP requests over a private Tailscale network and shows a
+modern, full-screen overlay with a persistent chat card, quick replies, live
+streaming responses, and human-in-the-loop approval for admin commands.
+
+---
+
+## Contents
+
+- [Features](#features)
+- [How it works](#how-it-works)
+- [Quick start](#quick-start)
+- [What you can send](#what-you-can-send)
+- [Chat, replies and streaming](#chat-replies-and-streaming)
+- [Admin shell approval](#admin-shell-approval)
+- [Safety and display behavior](#safety-and-display-behavior)
+- [Configuration](#configuration)
+- [Documentation](#documentation)
+- [Project structure](#project-structure)
+- [Build from source](#build-from-source)
+- [Roadmap](#roadmap)
+- [License](#license)
+
+## Features
+
+- **Full-screen overlay** with a translucent backdrop that spans every monitor,
+  while the card itself is centered on a single display — laptop + TV included.
+- **Persistent chat card** on every alert type, with transcript, Muse logo avatar,
+  your Windows profile photo, and live streaming with a typing indicator.
+- **Quick replies** that adapt to screen size and DPI, a custom composer
+  (`Enter` to send, `Shift+Enter` for a newline), and dynamic buttons that Muse
+  can replace with each new message.
+- **Taskbar-friendly** — the Windows taskbar stays visible and clickable above
+  the overlay.
+- **Admin approval** with an exact command preview, optional UAC elevation, and
+  a global off switch that returns HTTP 403.
+- **3-second safety lock** on every actionable control; clicking outside never
+  dismisses a prompt.
+- **Token-authenticated HTTP** with many aliases and payload formats, designed
+  for Tailscale but usable on any private network.
+- **No dependencies at runtime** — self-contained WPF binary, simple MSI install.
+- **Never disruptive** — Beacon never closes or restarts Tailscale, Stremio,
+  other apps, or the computer.
+
+## How it works
+
+```mermaid
+sequenceDiagram
+    participant M as Muse / script
+    participant B as Beacon (tray)
+    participant U as You
+    M->>B: POST /reply + Bearer token
+    B->>U: Full-screen popup with chat card
+    Note over U: 3s safety lock, then click / type
+    U->>B: Quick reply or custom text
+    B-->>M: Webhook + /result/{id}
+    M->>B: POST /chat (streamed delta + fresh options)
+    B->>U: Answer appears live in the same card
+```
+
+## Quick start
+
+1. Run `Beacon-Setup.msi` on the target Windows PC and allow the app through the
+   firewall when prompted.
+2. Double-click the tray icon (or right-click → **Open settings**).
+3. Note the listening URL, port (default `8765`), secret token, and the Tailscale
+   address Beacon detected.
+4. Choose your clock format and whether admin shell requests are allowed, then
+   press **Save settings**.
+5. Give the URL and token to your AI agent. See [muse.md](muse.md) for a complete
+   no-context setup prompt.
+
+Settings live in `%APPDATA%\Beacon\settings.json` and survive upgrades.
+
+### Test it
+
+```powershell
+$token = 'PASTE_TOKEN_HERE'
+
+$body = @{
+    title   = 'Captcha needs you'
+    message = 'Muse is waiting for you to solve a captcha.'
+    type    = 'captcha'
+    source  = 'Muse.ai'
+    code    = '482-913'
+    duration = 'never'
+    actions = @(@{ label = 'Copy code'; copy = '482-913' })
+} | ConvertTo-Json -Compress -Depth 6
+
+Invoke-RestMethod -Uri 'http://<TAILSCALE_HOST_OR_IP>:8765/notify' `
+  -Method Post `
+  -Headers @{ Authorization = "Bearer $token" } `
+  -Body $body -ContentType 'application/json'
+```
+
+Or with curl:
+
+```bash
+curl -X POST "http://<TAILSCALE_HOST_OR_IP>:8765/notify?token=YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Hello","message":"A popup from Muse","type":"info"}'
+```
+
+Check that Beacon is alive without a token:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8765/health
+```
+
+## What you can send
+
+| Endpoint | Purpose |
+| --- | --- |
+| `/notify` | Show a popup (many theme aliases such as `/captcha`, `/verification`, `/alert`) |
+| `/reply` | Popup + quick replies + persistent chat card |
+| `/shell` | Ask for approval before running a Windows command |
+| `/chat` | Stream Muse's answer into the chat card |
+| `/result/{id}` | Poll a reply or approval result |
+| `/health` | Status JSON, no token needed |
+| `/clear` | Dismiss the popup and empty the queue |
+
+Beacon accepts JSON objects, plain text, form data, and GET query parameters.
+Field names are case-insensitive with generous aliases. Highlights: `title`,
+`message` (Markdown), `type`, `code`, `source`, `details`, `image`, `progress`,
+`actions`, `duration`, `sound`, `color`, and `raw`.
+
+See the [full API reference](docs/API.md) for every field, alias, and response shape.
+
+## Chat, replies and streaming
+
+`POST /reply` opens the popup plus a docked chat card. Choosing a quick reply or
+typing a custom answer keeps the card open so Muse can answer in the same
+conversation. Every answer has a stable id: the first uses the original request
+id, and later answers use `-r2`, `-r3`, and so on.
+
+Muse streams its answer with small deltas:
+
+```json
+{ "id": "15e8c4af", "delta": "Working " }
+{ "id": "15e8c4af", "delta": "on it… " }
+{ "id": "15e8c4af", "delta": "", "done": true }
+```
+
+Fresh quick-reply buttons can be attached to any chat message:
+
+```json
+{
+  "id": "15e8c4af-r2",
+  "delta": "Here are the matches. ",
+  "options": [
+    { "label": "Apply all", "value": "apply_all" },
+    { "label": "Skip", "value": "skip" }
+  ]
+}
+```
+
+`"options": []` hides the button section; omitting `options` leaves the current
+buttons unchanged. Label length and button count adapt to the chat-card width.
+
+## Admin shell approval
+
+```json
+{
+  "title": "Admin approval needed",
+  "message": "Clear the stale build cache.",
+  "command": "echo Beacon shell test",
+  "shell": "cmd",
+  "elevated": false,
+  "wait": true,
+  "waitTimeout": 60
+}
+```
+
+Nothing runs until **Approve & run** is clicked. `elevated: true` triggers a real
+Windows UAC prompt. Turn off **Allow admin shell requests** in settings to reject
+all shell endpoints with `403` before a popup is created.
+
+## Safety and display behavior
+
+- Every action control is locked for **3 seconds** after a popup appears.
+- Clicking the backdrop never dismisses the prompt; moving the mouse away never
+  selects or tints the screen.
+- The translucent backdrop covers the full virtual screen, but the card is
+  centered on the display under the cursor (falling back to the primary display),
+  so it is never cut off on a laptop + TV setup.
+- Plugging in a display or changing resolution re-fits the popup automatically.
+- The taskbar is kept above the overlay and remains usable.
+- Beacon never restarts your PC, Tailscale, Stremio, or any other app.
+
+## Configuration
+
+All options are in the tray settings window:
+
+| Setting | Default | Notes |
+| --- | --- | --- |
+| Port | `8765` | Restart the listener after changing |
+| Bind interface | Any (Tailscale) | Loopback option available |
+| Require secret token | On | Generate/copy/rotate the token here |
+| Auto-dismiss | `20` seconds | `0` / `"never"` keeps the popup sticky |
+| Sound | On | Themed notification sounds |
+| Start with Windows | Off | Adds a per-user startup entry |
+| Clock format | 24-hour | Choose 12-hour for AM/PM |
+| Allow admin shell requests | On | Off returns 403 for `/shell` |
+
+## Documentation
+
+- [docs/API.md](docs/API.md) — endpoints, authentication, fields, results, streaming
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — components, threading, display model
+- [docs/SECURITY.md](docs/SECURITY.md) — auth, network and webhook guidance
+- [muse.md](muse.md) — ready-to-use Muse setup prompt (placeholders only)
+- [docs/MUSE_PROMPT.md](docs/MUSE_PROMPT.md) — alternate copy/paste prompt
+- [CHANGELOG.md](CHANGELOG.md) — release history
+- [CONTRIBUTING.md](CONTRIBUTING.md) — build and style notes
+
+## Project structure
+
+```text
+Beacon/
+├── src/Beacon/                 # WPF application
+│   ├── App.xaml(.cs)           # Tray app, routing, auth
+│   ├── Assets/                 # Icons and Muse logo
+│   ├── Models/                 # Payload, chat and interaction models
+│   ├── Services/               # HTTP, parsing, chat, settings, display helpers
+│   └── Views/                  # Overlay and settings windows
+├── installer/                  # WiX v4 MSI sources (Files.wxs is generated)
+├── tools/                      # Build and UI inspection scripts
+├── docs/                       # API, architecture, security, extra prompts
+├── muse.md                     # Release-safe Muse setup prompt
+├── CHANGELOG.md
+└── README.md
+```
+
+## Build from source
+
+Prerequisites: Windows 10/11 x64, .NET 8 SDK, and WiX Toolset v6 for the MSI.
+The scripts expect optional local tool copies in `.tools/dotnet` and `.tools/wix6`.
+
+```powershell
+# Publish self-contained
+.\.tools\dotnet\dotnet.exe publish src\Beacon\Beacon.csproj `
+  -c Release -r win-x64 --self-contained true -o publish\Beacon
+
+# Build Beacon-Setup.msi (also republishes)
+powershell -ExecutionPolicy Bypass -File tools\build_installer.ps1
+```
+
+## Roadmap
+
+- Optional automatic update check with a **Check for updates** button in settings
+  and signed release assets
+- Configurable hotkey to summon the overlay
+- Optional per-request sound override in the payload
+- Localization of popup text
+
+## License
+
+Released under the [MIT License](LICENSE).
