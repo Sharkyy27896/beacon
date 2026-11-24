@@ -1,7 +1,7 @@
 # Architecture
 
 Beacon is a single self-contained WPF application (`net8.0-windows`, `win-x64`).
-It has no external NuGet dependencies and ships as one MSI.
+It has no external NuGet dependencies and ships with a single-file, themed EXE installer.
 
 ```mermaid
 flowchart LR
@@ -71,7 +71,15 @@ hidden.
 
 ## Installer
 
-`tools/build_installer.ps1` republishes the app, generates `installer/Files.wxs`
-with repository-relative paths, and builds a WiX v4 MSI. `Product.wxs` owns the
-stable `UpgradeCode`, so a new MSI upgrades an existing installation in place and
-preserves `%APPDATA%\Beacon\settings.json`.
+`tools/build_installer.ps1` republishes the app, zips it into
+`src/Beacon.Installer/Payload/BeaconPayload.zip`, and publishes the installer as a
+single self-contained `Beacon-Setup.exe`. The installer is a WPF app with the same
+dark theme as Beacon. It detects an existing install (showing a **Repair** button),
+replaces the binaries, writes a registry uninstall entry, and creates a Start menu
+shortcut. **Advanced options** can override the install and app-data folders; the
+chosen data path is written to `Beacon.paths.json` beside the app and read by
+`SettingsService`. User settings are never touched.
+
+The v1.0.0 release build also includes a one-time downgrade path, enabled only by a
+local, gitignored `OneTimeDowngrade.local.props` file. It is not committed, so future
+builds from the repository reject attempts to downgrade a newer installation.

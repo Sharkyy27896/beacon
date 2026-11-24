@@ -11,6 +11,21 @@
             <GradientStop Color="#0F1727" Offset="1" />
         </LinearGradientBrush>
         <DropShadowEffect x:Key="PanelShadow" Color="#000000" BlurRadius="50" ShadowDepth="14" Opacity="0.7" />
+
+        <Storyboard x:Key="IntroStoryboard">
+            <DoubleAnimation Storyboard.TargetName="Panel" Storyboard.TargetProperty="Opacity"
+                             From="0" To="1" Duration="0:0:0.20">
+                <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="PanelScale" Storyboard.TargetProperty="ScaleX"
+                             From="0.985" To="1" Duration="0:0:0.24">
+                <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="PanelScale" Storyboard.TargetProperty="ScaleY"
+                             From="0.985" To="1" Duration="0:0:0.24">
+                <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+        </Storyboard>
         <Style x:Key="SmallButton" TargetType="Button">
             <Setter Property="Foreground" Value="#DCE8FB" />
             <Setter Property="Background" Value="#263550" />
@@ -187,8 +202,12 @@
         </Style>
     </Window.Resources>
 
-    <Border CornerRadius="20" Background="{StaticResource PanelGradient}" BorderBrush="#3A4C6B"
-            BorderThickness="1" Effect="{StaticResource PanelShadow}" Padding="0">
+    <Border x:Name="Panel" CornerRadius="20" Background="{StaticResource PanelGradient}" BorderBrush="#3A4C6B"
+            BorderThickness="1" Effect="{StaticResource PanelShadow}" Padding="0"
+            RenderTransformOrigin="0.5,0.5" Opacity="0">
+        <Border.RenderTransform>
+            <ScaleTransform x:Name="PanelScale" ScaleX="0.985" ScaleY="0.985" />
+        </Border.RenderTransform>
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />

@@ -3,56 +3,58 @@
 All notable changes to Beacon are documented here. Versions follow
 [Semantic Versioning](https://semver.org/).
 
-## [1.6.0]
+## [1.0.0] — current release
+
+The full feature set that was previously shipped as 1.6.0 is now released as 1.0.0.
+The version number was intentionally reset for this private release.
 
 ### Added
-- Multi-monitor aware popups — the translucent backdrop still covers the whole virtual screen, but the card is centered on a single display (the one under the cursor, falling back to the primary display). Fixes cut-off popups on laptop + TV setups.
-- Automatic re-fit when displays are plugged in, unplugged, or change resolution.
+- Tray app with a raw `TcpListener` HTTP server and token authentication over Tailscale.
+- Full-screen, multi-monitor aware popups with a dark, modern card UI.
+- Persistent chat cards with streaming replies, Muse/user avatars, and a typing indicator.
+- Adaptive quick replies, custom composer, and dynamic buttons that can change mid-conversation.
+- Human-in-the-loop admin shell approval with UAC elevation, result polling, and a global off switch.
+- 3-second safety lock on every actionable control; clicking outside never dismisses a prompt.
+- Themed single-file `Beacon-Setup.exe` installer with Start menu shortcut and registry uninstall entry.
+- Installer shows a **Repair** button when Beacon is already installed, and has
+  **Advanced options** to choose custom installation and app-data folders.
+- One-time downgrade path in this build only: running this installer over an existing
+  1.6.0 install and choosing Repair or Install replaces it and resets its reported
+  version to 1.0.0. Future builds cannot downgrade newer installations.
 
 ### Changed
-- Card sizing limits now come from the target display instead of the entire virtual screen, including correct mixed-DPI conversion.
-- Large transcript reserves extra space for wrapped quick-reply rows and the composer hint.
+- Version metadata, tray settings/API docs, README badge, and `/health` response now report `1.0.0`.
+- Replaced the WiX MSI installer with a self-contained WPF EXE installer matching Beacon's theme.
+- Smoothed transitions across the app and installer: compositor-friendly fade/scale
+  animation only (no layout-affecting width animations).
 
-## [1.5.0]
+### Safety
+- Beacon never closes or restarts Tailscale, Stremio, other apps, or the PC.
+- Settings in `%APPDATA%\Beacon\settings.json` are preserved across installation.
 
-### Added
-- **Allow admin shell requests (/shell)** setting. When disabled, shell endpoints return HTTP 403 before any popup is created.
-- Adaptive quick-reply rows gain a 6 px vertical gap.
+---
 
-### Changed
-- Removed the redundant "clicking outside will not dismiss" banner.
-- Both Muse setup prompts document the shell 403 behavior.
+## Pre-release history
 
-## [1.4.0]
+These versions were used internally before the version reset. They are superseded by 1.0.0.
 
-### Added
-- Universal persistent chat card for every alert type.
-- Dynamic quick replies — Muse can replace buttons in any `/chat` message; `options: []` clears them.
-- Screen-adaptive quick-reply limits (button count and label length scale with chat-card width).
-- 12/24-hour clock setting.
+### 1.6.0
+- Multi-monitor aware popups with per-display sizing and mixed-DPI handling.
 
-### Fixed
-- Custom reply send button now reads exactly **Send**.
+### 1.5.0
+- Admin shell permission switch and adaptive quick-reply spacing.
 
-## [1.3.0]
+### 1.4.0
+- Universal persistent chat card, dynamic quick replies, and 12/24-hour clock setting.
 
-### Added
-- Live streaming chat with typing indicator and Muse avatar.
-- Webhook callbacks and follow-up result ids (`-r2`, `-r3`, …).
-- Windows profile photo avatar for user messages.
+### 1.3.0
+- Streaming chat, webhook callbacks, follow-up ids, and Windows profile photo avatar.
 
-## [1.2.0]
+### 1.2.0
+- Admin shell approval popup with UAC elevation and 3-second safety lock.
 
-### Added
-- Admin shell approval popup with UAC elevation, result polling, and a 3-second safety lock.
+### 1.1.0
+- Quick replies, custom reply box, persistent conversations, and tray settings.
 
-## [1.1.0]
-
-### Added
-- Quick replies, custom reply box, and persistent conversations.
-- Tray settings window with token regeneration, port/bind configuration, and firewall hint.
-
-## [1.0.0]
-
-### Added
-- Initial release: tray app, raw `TcpListener` HTTP server, token auth, and full-screen popups.
+### 1.0.0 (internal prototype)
+- Initial tray bridge, token auth, and full-screen popups.

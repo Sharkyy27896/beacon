@@ -6,7 +6,7 @@
 
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?style=flat-square&logo=windows)
 ![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square&logo=dotnet)
-![Version](https://img.shields.io/badge/version-1.6.0-2EA043?style=flat-square)
+![Version](https://img.shields.io/badge/version-1.0.0-2EA043?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-0969DA?style=flat-square&logo=git)
 ![Visibility](https://img.shields.io/badge/repo-private-6E7781?style=flat-square&logo=github)
 
@@ -53,7 +53,7 @@ streaming responses, and human-in-the-loop approval for admin commands.
   dismisses a prompt.
 - **Token-authenticated HTTP** with many aliases and payload formats, designed
   for Tailscale but usable on any private network.
-- **No dependencies at runtime** — self-contained WPF binary, simple MSI install.
+- **No dependencies at runtime** — self-contained WPF binary and a single themed `Beacon-Setup.exe` installer.
 - **Never disruptive** — Beacon never closes or restarts Tailscale, Stremio,
   other apps, or the computer.
 
@@ -75,14 +75,19 @@ sequenceDiagram
 
 ## Quick start
 
-1. Run `Beacon-Setup.msi` on the target Windows PC and allow the app through the
-   firewall when prompted.
-2. Double-click the tray icon (or right-click → **Open settings**).
-3. Note the listening URL, port (default `8765`), secret token, and the Tailscale
+1. Run `Beacon-Setup.exe` on the target Windows PC, approve the UAC prompt, and
+   allow the app through the firewall when prompted. The installer uses the same
+   dark theme as Beacon and preserves your existing settings. If Beacon is already
+   installed, a **Repair** button appears; use it to reinstall at 1.0.0.
+2. **Advanced options** in the installer lets you change the installation folder and
+   the app-data folder before installing. By default these are
+   `C:\Program Files\Beacon` and `%APPDATA%\Beacon`.
+3. Double-click the tray icon (or right-click → **Open settings**).
+4. Note the listening URL, port (default `8765`), secret token, and the Tailscale
    address Beacon detected.
-4. Choose your clock format and whether admin shell requests are allowed, then
+5. Choose your clock format and whether admin shell requests are allowed, then
    press **Save settings**.
-5. Give the URL and token to your AI agent. See [muse.md](muse.md) for a complete
+6. Give the URL and token to your AI agent. See [muse.md](muse.md) for a complete
    no-context setup prompt.
 
 Settings live in `%APPDATA%\Beacon\settings.json` and survive upgrades.
@@ -237,7 +242,7 @@ Beacon/
 │   ├── Models/                 # Payload, chat and interaction models
 │   ├── Services/               # HTTP, parsing, chat, settings, display helpers
 │   └── Views/                  # Overlay and settings windows
-├── installer/                  # WiX v4 MSI sources (Files.wxs is generated)
+├── src/Beacon.Installer/       # Themed single-file EXE installer (WPF)
 ├── tools/                      # Build and UI inspection scripts
 ├── docs/                       # API, architecture, security, extra prompts
 ├── muse.md                     # Release-safe Muse setup prompt
@@ -247,17 +252,17 @@ Beacon/
 
 ## Build from source
 
-Prerequisites: Windows 10/11 x64, .NET 8 SDK, and WiX Toolset v6 for the MSI.
-The scripts expect optional local tool copies in `.tools/dotnet` and `.tools/wix6`.
+Prerequisites: Windows 10/11 x64 and .NET 8 SDK. A private tool copy can be placed
+in `.tools/dotnet`; otherwise the script uses `dotnet` from PATH.
 
 ```powershell
-# Publish self-contained
-.\.tools\dotnet\dotnet.exe publish src\Beacon\Beacon.csproj `
-  -c Release -r win-x64 --self-contained true -o publish\Beacon
-
-# Build Beacon-Setup.msi (also republishes)
+# Publishes the app, embeds it in the themed installer, and produces Beacon-Setup.exe
 powershell -ExecutionPolicy Bypass -File tools\build_installer.ps1
 ```
+
+The one-time downgrade capability used by the v1.0.0 release is activated by a
+local, gitignored `src/Beacon.Installer/OneTimeDowngrade.local.props` file that is
+not part of the repository, so future builds cannot downgrade newer installs.
 
 ## Roadmap
 

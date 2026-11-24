@@ -551,8 +551,8 @@ public partial class NotificationWindow : Window
         if (remaining <= 0 || width <= 0) return;
 
         CountdownFill.Width = width;
-        CountdownFill.BeginAnimation(FrameworkElement.WidthProperty,
-            new DoubleAnimation(width, 0, TimeSpan.FromMilliseconds(remaining))
+        CountdownScale.BeginAnimation(ScaleTransform.ScaleXProperty,
+            new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(remaining))
             {
                 FillBehavior = FillBehavior.HoldEnd
             });
@@ -564,7 +564,7 @@ public partial class NotificationWindow : Window
         _closing = true;
         _countdownTimer?.Stop();
         _safetyTimer?.Stop();
-        CountdownFill.BeginAnimation(FrameworkElement.WidthProperty, null);
+        CountdownScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
         var storyboard = (Storyboard)FindResource("ExitStoryboard");
         storyboard.Completed += (_, _) => Close();
         storyboard.Begin(this);

@@ -23,7 +23,7 @@ public partial class App : Application
 
     public static string AppVersion { get; } =
         typeof(App).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
-        ?? typeof(App).Assembly.GetName().Version?.ToString() ?? "1.1.0";
+        ?? typeof(App).Assembly.GetName().Version?.ToString() ?? "1.0.0";
 
     public AppSettings Settings { get; private set; } = new();
     public HttpServer Server { get; } = new();

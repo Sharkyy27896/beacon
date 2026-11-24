@@ -286,7 +286,11 @@
                         CornerRadius="2" ClipToBounds="True">
                     <Border x:Name="CountdownFill" Height="4" Width="0"
                             HorizontalAlignment="Left" Background="#5C9BFF"
-                            CornerRadius="2" />
+                            CornerRadius="2" RenderTransformOrigin="0,0.5">
+                        <Border.RenderTransform>
+                            <ScaleTransform x:Name="CountdownScale" ScaleX="1" ScaleY="1" />
+                        </Border.RenderTransform>
+                    </Border>
                 </Border>
             </Grid>
         </Border>

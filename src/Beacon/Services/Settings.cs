@@ -26,8 +26,34 @@ public sealed class SettingsService
         WriteIndented = true
     };
 
-    public static string SettingsDirectory => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Beacon");
+    private static readonly Lazy<string> SettingsDirectoryValue = new(() =>
+    {
+        // The installer can write Beacon.paths.json beside the app when the user
+        // chooses a custom app-data location in Advanced options.
+        var pathsFile = Path.Combine(AppContext.BaseDirectory, "Beacon.paths.json");
+        if (File.Exists(pathsFile))
+        {
+            try
+            {
+                using var document = JsonDocument.Parse(File.ReadAllText(pathsFile));
+                if (document.RootElement.TryGetProperty("DataDirectory", out var value))
+                {
+                    var custom = value.GetString();
+                    if (!string.IsNullOrWhiteSpace(custom))
+                        return Path.GetFullPath(Environment.ExpandEnvironmentVariables(custom));
+                }
+            }
+            catch
+            {
+                // Malformed path file falls back to the default location.
+            }
+        }
+
+        return Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Beacon");
+    });
+
+    public static string SettingsDirectory => SettingsDirectoryValue.Value;
 
     public static string SettingsPath => Path.Combine(SettingsDirectory, "settings.json");
 

@@ -17,6 +17,12 @@ publish/
 *.wixpdb
 *.cab
 
+# Generated EXE-installer payload (rebuilt from the published app)
+src/Beacon.Installer/Payload/
+
+# One-time downgrade build flag — local only, never committed
+src/Beacon.Installer/OneTimeDowngrade.local.props
+
 # Visual Studio / Rider / editor files
 .vs/
 .vscode/

@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Beacon.Installer</RootNamespace>
+    <AssemblyName>Beacon.Setup</AssemblyName>
+    <ApplicationIcon>../Beacon/Assets/beacon.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Product>Beacon Setup</Product>
+    <Company>Beacon</Company>
+
+  </PropertyGroup>
+
+  <!--
+    ONE-TIME DOWNGRADE (v1.0.0 release build only)
+
+    The downgrade path is compiled in only when a local, gitignored
+    OneTimeDowngrade.local.props file exists. It is intentionally NOT committed:
+    future builds from this repository will not have the symbol and therefore
+    cannot downgrade a newer installation.
+  -->
+  <Import Project="OneTimeDowngrade.local.props"
+          Condition="Exists('OneTimeDowngrade.local.props')" />
+
+  <ItemGroup>
+    <Resource Include="../Beacon/Assets/beacon.ico" Link="Assets/beacon.ico" />
+    <EmbeddedResource Include="Payload/BeaconPayload.zip"
+                      Condition="Exists('Payload/BeaconPayload.zip')"
+                      LogicalName="BeaconPayload.zip" />
+  </ItemGroup>
+
+</Project>

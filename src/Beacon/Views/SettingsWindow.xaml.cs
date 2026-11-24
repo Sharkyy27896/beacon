@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using Beacon.Models;
 using Beacon.Services;
 using Application = System.Windows.Application;
@@ -34,7 +35,11 @@ public partial class SettingsWindow : Window
         PortBox.TextChanged += (_, _) => UpdateUrl();
         UpdateUrl();
         RefreshStatus();
-        Loaded += (_, _) => ApplyModernScrollbars(this);
+        Loaded += (_, _) =>
+        {
+            ApplyModernScrollbars(this);
+            ((Storyboard)FindResource("IntroStoryboard")).Begin(this);
+        };
     }
 
     private static void ApplyModernScrollbars(DependencyObject root)
