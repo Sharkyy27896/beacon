@@ -2,7 +2,7 @@ $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Set-Location $root
 
-# Use the private toolchain when present, otherwise whatever dotnet is on PATH.
+# Use the local toolchain when present, otherwise whatever dotnet is on PATH.
 $dotnet = Join-Path $root '.tools\dotnet\dotnet.exe'
 if (-not (Test-Path $dotnet)) { $dotnet = 'dotnet' }
 
@@ -23,8 +23,7 @@ if (Test-Path $payloadZip) { Remove-Item $payloadZip -Force }
 Compress-Archive -Path (Join-Path $publishDir '*') -DestinationPath $payloadZip -CompressionLevel Optimal
 Write-Host "Payload: $payloadZip ($([math]::Round((Get-Item $payloadZip).Length / 1MB, 1)) MB)"
 
-# 3. Build the single-file themed installer. ONE_TIME_DOWNGRADE_TO_1_0_0 is
-#    defined in Beacon.Installer.csproj for this release build only.
+# 3. Build the single-file themed installer.
 & $dotnet publish (Join-Path $root 'src\Beacon.Installer\Beacon.Installer.csproj') `
     -c Release -r win-x64 --self-contained true `
     -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `

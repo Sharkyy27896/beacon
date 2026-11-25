@@ -8,7 +8,6 @@
 ![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square&logo=dotnet)
 ![Version](https://img.shields.io/badge/version-1.0.0-2EA043?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-0969DA?style=flat-square&logo=git)
-![Visibility](https://img.shields.io/badge/repo-private-6E7781?style=flat-square&logo=github)
 
 </div>
 
@@ -99,7 +98,7 @@ sequenceDiagram
    no-context setup prompt.
 
 Settings live in `%APPDATA%\Beacon\settings.json` on Windows and
-`~/.config/Beacon/settings.json` on Linux, and survive upgrades.
+`~/.config/Beacon/settings.json` on Linux, outside the app folder.
 
 ### Linux
 
@@ -284,10 +283,6 @@ in `.tools/dotnet`; otherwise the script uses `dotnet` from PATH.
 # Publishes the app, embeds it in the themed installer, and produces Beacon-Setup.exe
 powershell -ExecutionPolicy Bypass -File tools\build_installer.ps1
 ```
-
-The one-time downgrade capability used by the v1.0.0 release is activated by a
-local, gitignored `src/Beacon.Installer/OneTimeDowngrade.local.props` file that is
-not part of the repository, so future builds cannot downgrade newer installs.
 
 For Linux, GitHub Actions builds `Beacon-x86_64.AppImage` from
 `src/Beacon.Linux/Beacon.Linux.csproj` on `ubuntu-latest` and uploads it as an

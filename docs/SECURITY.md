@@ -7,9 +7,9 @@ settings or via `GET /health`.
 
 ## Reporting a vulnerability
 
-This repository is private. If you find a security issue, contact the repository
-owner directly rather than opening a public issue. Include the affected version,
-steps to reproduce, and impact.
+If you find a security issue, use GitHub's Security → Report a vulnerability form
+or contact the repository owner directly rather than opening a public issue.
+Include the affected version, steps to reproduce, and impact.
 
 ## Security model
 

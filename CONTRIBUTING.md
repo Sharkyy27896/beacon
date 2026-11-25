@@ -1,12 +1,12 @@
 # Contributing
 
-Thanks for your interest in Beacon. This repository is private, so contributions are
-currently limited to the project owner, but the same workflow applies if you clone it.
+Thanks for your interest in Beacon. Contributions are welcome: fork the
+repository, make your change, and open a pull request.
 
 ## Prerequisites
 
 - Windows 10/11 (x64)
-- .NET 8 SDK (a private copy can be placed in `.tools/dotnet/`)
+- .NET 8 SDK (a local copy can be placed in `.tools/dotnet/`)
 - Python 3 with Pillow (optional, only to regenerate the app icon)
 
 ## Build
@@ -24,7 +24,7 @@ powershell -ExecutionPolicy Bypass -File tools\build_installer.ps1
 ```
 
 The installer is a self-contained WPF app in `src/Beacon.Installer`. Its payload zip
-and any local build flags are gitignored generated files — never commit them.
+is a gitignored generated file — never commit it.
 
 ## Code style
 

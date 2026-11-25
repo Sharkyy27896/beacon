@@ -79,7 +79,3 @@ replaces the binaries, writes a registry uninstall entry, and creates a Start me
 shortcut. **Advanced options** can override the install and app-data folders; the
 chosen data path is written to `Beacon.paths.json` beside the app and read by
 `SettingsService`. User settings are never touched.
-
-The v1.0.0 release build also includes a one-time downgrade path, enabled only by a
-local, gitignored `OneTimeDowngrade.local.props` file. It is not committed, so future
-builds from the repository reject attempts to downgrade a newer installation.

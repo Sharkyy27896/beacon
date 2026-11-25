@@ -20,17 +20,6 @@
 
   </PropertyGroup>
 
-  <!--
-    ONE-TIME DOWNGRADE (v1.0.0 release build only)
-
-    The downgrade path is compiled in only when a local, gitignored
-    OneTimeDowngrade.local.props file exists. It is intentionally NOT committed:
-    future builds from this repository will not have the symbol and therefore
-    cannot downgrade a newer installation.
-  -->
-  <Import Project="OneTimeDowngrade.local.props"
-          Condition="Exists('OneTimeDowngrade.local.props')" />
-
   <ItemGroup>
     <Resource Include="../Beacon/Assets/beacon.ico" Link="Assets/beacon.ico" />
     <EmbeddedResource Include="Payload/BeaconPayload.zip"
