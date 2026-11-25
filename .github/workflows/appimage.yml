@@ -50,6 +50,9 @@ jobs:
           Categories=Utility;
           Terminal=false
           EOF
+          # appimagetool accepts either location; keeping a copy at the AppDir
+          # root makes discovery independent of its search-order preferences.
+          cp AppDir/usr/share/applications/beacon.desktop AppDir/beacon.desktop
 
           cat > AppDir/AppRun <<'EOF'
           #!/bin/sh
