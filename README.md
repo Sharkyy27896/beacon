@@ -276,7 +276,7 @@ Beacon/
 
 ## Build from source
 
-Prerequisites: Windows 10/11 x64 and .NET 8 SDK. A private tool copy can be placed
+Prerequisites: Windows 10/11 x64 and .NET 8 SDK. A local tool copy can be placed
 in `.tools/dotnet`; otherwise the script uses `dotnet` from PATH.
 
 ```powershell
