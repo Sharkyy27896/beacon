@@ -30,14 +30,15 @@ steps to reproduce, and impact.
 - Beacon is intended to be reachable only over a private Tailscale network.
 - Do not port-forward the listener to the public internet.
 - Windows Firewall may need one inbound rule for `Beacon.exe`; the exact `netsh`
-  command is in the main README.
+  command is in the main README. Linux has no dedicated installer or firewall rule;
+  the AppImage listens on the same configurable port.
 
 ### Shell approval
 
 - `/shell` never executes anything without an explicit **Approve & run** click.
 - **Deny**, **Cancel**, Escape and timeout never execute the command.
 - `elevated: true` triggers a real Windows UAC consent prompt that cannot be
-  suppressed programmatically.
+  suppressed programmatically, or `pkexec` on Linux when available.
 - The **Allow admin shell requests** checkbox rejects all shell endpoints with
   `403` before a popup is even created.
 - Beacon never uses shell approval to restart the PC, Tailscale, Stremio, or any

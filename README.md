@@ -2,9 +2,9 @@
 
 # Beacon
 
-**Turn an HTTP request into a big, beautiful, full-screen Windows popup.**
+**Turn an HTTP request into a big, beautiful, full-screen Windows or Linux popup.**
 
-![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?style=flat-square&logo=windows)
+![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20%2B%20Linux-2EA043?style=flat-square)
 ![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square&logo=dotnet)
 ![Version](https://img.shields.io/badge/version-1.0.0-2EA043?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-0969DA?style=flat-square&logo=git)
@@ -41,19 +41,22 @@ streaming responses, and human-in-the-loop approval for admin commands.
 - **Full-screen overlay** with a translucent backdrop that spans every monitor,
   while the card itself is centered on a single display — laptop + TV included.
 - **Persistent chat card** on every alert type, with transcript, Muse logo avatar,
-  your Windows profile photo, and live streaming with a typing indicator.
+  your account photo, and live streaming with a typing indicator.
 - **Quick replies** that adapt to screen size and DPI, a custom composer
   (`Enter` to send, `Shift+Enter` for a newline), and dynamic buttons that Muse
   can replace with each new message.
-- **Taskbar-friendly** — the Windows taskbar stays visible and clickable above
-  the overlay.
-- **Admin approval** with an exact command preview, optional UAC elevation, and
-  a global off switch that returns HTTP 403.
+- **Desktop-friendly** — the Windows taskbar (and Linux panels) stay visible and
+  clickable above the overlay.
+- **Admin approval** with an exact command preview, optional elevation (UAC on
+  Windows, `pkexec` on Linux), and a global off switch that returns HTTP 403.
 - **3-second safety lock** on every actionable control; clicking outside never
   dismisses a prompt.
 - **Token-authenticated HTTP** with many aliases and payload formats, designed
   for Tailscale but usable on any private network.
-- **No dependencies at runtime** — self-contained WPF binary and a single themed `Beacon-Setup.exe` installer.
+- **No dependencies at runtime** — self-contained Windows app with a themed
+  `Beacon-Setup.exe` installer, or a native Avalonia Linux AppImage.
+- **One-click updater** — settings has a **Check for updates** button that uses the
+  GitHub Releases feed (no installer browsing required).
 - **Never disruptive** — Beacon never closes or restarts Tailscale, Stremio,
   other apps, or the computer.
 
@@ -90,7 +93,21 @@ sequenceDiagram
 6. Give the URL and token to your AI agent. See [muse.md](muse.md) for a complete
    no-context setup prompt.
 
-Settings live in `%APPDATA%\Beacon\settings.json` and survive upgrades.
+Settings live in `%APPDATA%\Beacon\settings.json` on Windows and
+`~/.config/Beacon/settings.json` on Linux, and survive upgrades.
+
+### Linux
+
+1. Download `Beacon-x86_64.AppImage` from the release, make it executable with
+   `chmod +x Beacon-x86_64.AppImage`, and run it. No installation is required.
+2. Open the tray icon → **Open settings** to copy the listening URL and token.
+3. To start Beacon with your desktop session, enable **Start with Linux session**;
+   this writes `~/.config/autostart/Beacon.desktop`.
+4. Use **Check for updates** in settings to replace the running AppImage with the
+   newest release in one click.
+
+The Linux build is a native Avalonia port — not Wine — and uses the same HTTP
+API, settings format, chat/quick-reply behavior, and safety lock as Windows.
 
 ### Test it
 
@@ -133,7 +150,7 @@ Invoke-RestMethod http://127.0.0.1:8765/health
 | --- | --- |
 | `/notify` | Show a popup (many theme aliases such as `/captcha`, `/verification`, `/alert`) |
 | `/reply` | Popup + quick replies + persistent chat card |
-| `/shell` | Ask for approval before running a Windows command |
+| `/shell` | Ask for approval before running a command (Windows or Linux) |
 | `/chat` | Stream Muse's answer into the chat card |
 | `/result/{id}` | Poll a reply or approval result |
 | `/health` | Status JSON, no token needed |
@@ -192,8 +209,9 @@ buttons unchanged. Label length and button count adapt to the chat-card width.
 ```
 
 Nothing runs until **Approve & run** is clicked. `elevated: true` triggers a real
-Windows UAC prompt. Turn off **Allow admin shell requests** in settings to reject
-all shell endpoints with `403` before a popup is created.
+Windows UAC prompt or, on Linux, `pkexec` when available. Turn off **Allow admin
+shell requests** in settings to reject all shell endpoints with `403` before a
+popup is created.
 
 ## Safety and display behavior
 
@@ -204,7 +222,7 @@ all shell endpoints with `403` before a popup is created.
   centered on the display under the cursor (falling back to the primary display),
   so it is never cut off on a laptop + TV setup.
 - Plugging in a display or changing resolution re-fits the popup automatically.
-- The taskbar is kept above the overlay and remains usable.
+- The Windows taskbar (and Linux desktop panels) are kept above the overlay.
 - Beacon never restarts your PC, Tailscale, Stremio, or any other app.
 
 ## Configuration
@@ -218,7 +236,7 @@ All options are in the tray settings window:
 | Require secret token | On | Generate/copy/rotate the token here |
 | Auto-dismiss | `20` seconds | `0` / `"never"` keeps the popup sticky |
 | Sound | On | Themed notification sounds |
-| Start with Windows | Off | Adds a per-user startup entry |
+| Start with Windows / Linux session | Off | Adds a per-user startup entry |
 | Clock format | 24-hour | Choose 12-hour for AM/PM |
 | Allow admin shell requests | On | Off returns 403 for `/shell` |
 
@@ -243,6 +261,8 @@ Beacon/
 │   ├── Services/               # HTTP, parsing, chat, settings, display helpers
 │   └── Views/                  # Overlay and settings windows
 ├── src/Beacon.Installer/       # Themed single-file EXE installer (WPF)
+├── src/Beacon.Linux/           # Native Avalonia app + AppImage source
+├── .github/workflows/          # Windows build + Linux AppImage release artifact
 ├── tools/                      # Build and UI inspection scripts
 ├── docs/                       # API, architecture, security, extra prompts
 ├── muse.md                     # Release-safe Muse setup prompt
@@ -264,10 +284,13 @@ The one-time downgrade capability used by the v1.0.0 release is activated by a
 local, gitignored `src/Beacon.Installer/OneTimeDowngrade.local.props` file that is
 not part of the repository, so future builds cannot downgrade newer installs.
 
+For Linux, GitHub Actions builds `Beacon-x86_64.AppImage` from
+`src/Beacon.Linux/Beacon.Linux.csproj` on `ubuntu-latest` and uploads it as an
+artifact for attachment to the release.
+
 ## Roadmap
 
-- Optional automatic update check with a **Check for updates** button in settings
-  and signed release assets
+- Signed release assets
 - Configurable hotkey to summon the overlay
 - Optional per-request sound override in the payload
 - Localization of popup text

@@ -16,6 +16,11 @@ The version number was intentionally reset for this private release.
 - Human-in-the-loop admin shell approval with UAC elevation, result polling, and a global off switch.
 - 3-second safety lock on every actionable control; clicking outside never dismisses a prompt.
 - Themed single-file `Beacon-Setup.exe` installer with Start menu shortcut and registry uninstall entry.
+- Added a **Check for updates** button to tray settings. It reads the public GitHub
+  Releases feed and can download/apply the newest asset in one click (`Beacon-Setup.exe`
+  on Windows, `Beacon-x86_64.AppImage` on Linux).
+- Added a native Avalonia Linux port packaged as `Beacon-x86_64.AppImage`, with the
+  same HTTP API, chat, quick replies, shell approval, and 3-second safety lock.
 - Installer shows a **Repair** button when Beacon is already installed, and has
   **Advanced options** to choose custom installation and app-data folders.
 - One-time downgrade path in this build only: running this installer over an existing
@@ -27,6 +32,11 @@ The version number was intentionally reset for this private release.
 - Replaced the WiX MSI installer with a self-contained WPF EXE installer matching Beacon's theme.
 - Smoothed transitions across the app and installer: compositor-friendly fade/scale
   animation only (no layout-affecting width animations).
+
+### Fixed
+- Windows one-click updates now download to a writable temp path and pass the
+  running install directory to the silent installer, preserving custom installs.
+- `Auto-dismiss = 0` and `duration: 0` now keep popups sticky as documented.
 
 ### Safety
 - Beacon never closes or restarts Tailscale, Stremio, other apps, or the PC.

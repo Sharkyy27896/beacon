@@ -17,8 +17,8 @@ flowchart LR
     H -->|"user decision"| I[InteractionService]
     I -->|"/result/{id} or webhook"| A
     H -->|"approved command"| J[ElevatedRunner]
-    J -->|"UAC prompt"| K[(Windows shell)]
-    S[Settings<br/>%APPDATA%\Beacon] -.-> B
+    J -->|"UAC / pkexec prompt"| K[(Approved shell)]
+    S[Settings<br/>%APPDATA%\Beacon or ~/.config/Beacon] -.-> B
     S -.-> H
 ```
 

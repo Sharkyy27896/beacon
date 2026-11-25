@@ -22,7 +22,7 @@ A missing or incorrect token returns `401 Unauthorized`.
 | --- | --- | --- |
 | `/notify` | POST, PUT, GET | Show a popup. Aliases: `/alert`, `/message`, `/show`, `/captcha`, `/verification`, `/verify`, `/code`, `/otp`, `/confirm`, `/reminder`, `/notification`, `/push`, `/` |
 | `/reply` | POST, PUT | Popup with quick replies and a persistent chat card. Aliases: `/ask`, `/question`, `/prompt`, `/interact`, `/quickreply` |
-| `/shell` | POST, PUT | Approval popup for a Windows command. Aliases: `/exec`, `/run`, `/admin`, `/command` |
+| `/shell` | POST, PUT | Approval popup for a command on the current platform. Aliases: `/exec`, `/run`, `/admin`, `/command` |
 | `/chat` | POST, PUT | Append complete or streamed chat text to the card. Aliases: `/chat/stream`, `/reply/stream`, `/muse/reply` |
 | `/result/{id}` | GET | Poll a reply or approval result. Aliases: `/interaction/{id}`, `/reply/result/{id}`, `/shell/result/{id}` |
 | `/health` | GET | Status JSON — no token required. Aliases: `/ping`, `/status` |

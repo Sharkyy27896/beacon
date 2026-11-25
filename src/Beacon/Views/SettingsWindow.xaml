@@ -321,6 +321,19 @@
                               Content="Allow admin shell requests (/shell)"
                               ToolTip="Turn off to reject all shell/command requests with HTTP 403" IsChecked="True" />
 
+                    <TextBlock Text="UPDATES" Style="{StaticResource SectionLabel}" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="UpdateStatusText" VerticalAlignment="Center" FontSize="12"
+                                   Foreground="#7F94B4" Text="Check for a newer Beacon release." />
+                        <Button x:Name="UpdateButton" Grid.Column="1" Content="Check for updates"
+                                Style="{StaticResource SmallButton}" Margin="8,0,0,0"
+                                Click="UpdateButton_Click" />
+                    </Grid>
+
                     <TextBlock Text="SEND FROM MUSE / ANY DEVICE" Style="{StaticResource SectionLabel}" />
                     <Grid>
                         <Grid.ColumnDefinitions>

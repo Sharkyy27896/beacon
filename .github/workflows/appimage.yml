@@ -1,0 +1,88 @@
+name: AppImage (Linux x86_64)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+jobs:
+  appimage:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      # Version stays 1.0.0 as defined in the csproj; nothing here overrides it.
+      - name: Restore
+        run: dotnet restore src/Beacon.Linux/Beacon.Linux.csproj -r linux-x64
+
+      - name: Build
+        run: dotnet build src/Beacon.Linux/Beacon.Linux.csproj -c Release -r linux-x64 --no-restore
+
+      - name: Publish (self-contained linux-x64)
+        run: dotnet publish src/Beacon.Linux/Beacon.Linux.csproj -c Release -r linux-x64 --self-contained true -o publish/Beacon.Linux --no-restore
+
+      - name: Assemble AppDir
+        run: |
+          mkdir -p AppDir/usr/bin
+          mkdir -p AppDir/usr/share/applications
+          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
+
+          # Published executable plus all runtime assets (DLLs, runtimeconfig, native libs).
+          cp -a publish/Beacon.Linux/. AppDir/usr/bin/
+          chmod +x AppDir/usr/bin/Beacon
+
+          cp src/Beacon.Linux/Assets/beacon.png AppDir/usr/share/icons/hicolor/256x256/apps/beacon.png
+
+          cat > AppDir/usr/share/applications/beacon.desktop <<'EOF'
+          [Desktop Entry]
+          Type=Application
+          Name=Beacon
+          Exec=Beacon
+          Icon=beacon
+          Categories=Utility;
+          Terminal=false
+          EOF
+
+          cat > AppDir/AppRun <<'EOF'
+          #!/bin/sh
+          # The AppImage runtime exports APPIMAGE; provide a fallback for direct AppRun launches.
+          if [ -z "${APPIMAGE:-}" ]; then
+            export APPIMAGE="${APPDIR}/Beacon-x86_64.AppImage"
+          fi
+          exec "$APPDIR/usr/bin/Beacon" "$@"
+          EOF
+          chmod +x AppDir/AppRun
+
+      - name: Install appimagetool (official continuous release)
+        run: |
+          curl -fsSL -o appimagetool-x86_64.AppImage \
+            https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool-x86_64.AppImage
+
+      - name: Build AppImage
+        run: |
+          ./appimagetool-x86_64.AppImage --appimage-extract-and-run AppDir Beacon-x86_64.AppImage
+
+      - name: Job summary with SHA256
+        run: |
+          sha=$(sha256sum Beacon-x86_64.AppImage | cut -d' ' -f1)
+          {
+            echo "### Beacon Linux AppImage"
+            echo "Artifact: \`Beacon-x86_64.AppImage\`"
+            echo "SHA256: \`$sha\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload AppImage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Beacon-Linux-AppImage
+          path: Beacon-x86_64.AppImage
+          if-no-files-found: error

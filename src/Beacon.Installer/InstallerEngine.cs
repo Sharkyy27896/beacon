@@ -63,6 +63,37 @@ public static class InstallerEngine
 
     private const string UninstallKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Beacon";
 
+    /// <summary>
+    /// Finds an existing Beacon install from the running executable or the
+    /// uninstall registry entry. Used by silent repair/uninstall paths so a
+    /// custom install directory is preserved instead of falling back to
+    /// Program Files.
+    /// </summary>
+    public static string? DetectCurrentInstallDirectory()
+    {
+        var processDirectory = Path.GetDirectoryName(Environment.ProcessPath);
+        if (!string.IsNullOrWhiteSpace(processDirectory) &&
+            File.Exists(Path.Combine(processDirectory, "Beacon.exe")))
+            return processDirectory;
+
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(UninstallKey);
+            var location = key?.GetValue("InstallLocation") as string;
+            if (!string.IsNullOrWhiteSpace(location))
+            {
+                var full = Path.GetFullPath(Environment.ExpandEnvironmentVariables(location));
+                if (File.Exists(Path.Combine(full, "Beacon.exe"))) return full;
+            }
+        }
+        catch
+        {
+            // The registry may be unavailable from a non-elevated context.
+        }
+
+        return null;
+    }
+
     public static InstallState Detect(InstallOptions options)
     {
         var exe = Path.Combine(options.InstallDirectory, "Beacon.exe");

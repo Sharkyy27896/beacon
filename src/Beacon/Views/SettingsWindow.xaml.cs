@@ -193,4 +193,57 @@ public partial class SettingsWindow : Window
     {
         if (e.ChangedButton == MouseButton.Left) DragMove();
     }
+
+    private UpdateInfo? _availableUpdate;
+
+    private async void UpdateButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_availableUpdate is not null)
+        {
+            UpdateButton.IsEnabled = false;
+            UpdateStatusText.Text = "Downloading update…";
+            try
+            {
+                var progress = new Progress<(int Percent, string Text)>(p =>
+                    UpdateStatusText.Text = $"{p.Text} {p.Percent}%");
+                var message = await UpdateService.DownloadAndApplyAsync(_availableUpdate, progress);
+                UpdateStatusText.Text = message;
+                _availableUpdate = null;
+                UpdateButton.Content = "Check for updates";
+            }
+            catch (Exception ex)
+            {
+                UpdateStatusText.Text = $"Update failed: {ex.Message}";
+            }
+            finally
+            {
+                UpdateButton.IsEnabled = true;
+            }
+            return;
+        }
+
+        UpdateButton.IsEnabled = false;
+        UpdateStatusText.Text = "Checking GitHub…";
+        try
+        {
+            _availableUpdate = await UpdateService.CheckAsync(App.AppVersion);
+            if (_availableUpdate is null)
+            {
+                UpdateStatusText.Text = "You're up to date (v" + App.AppVersion + ").";
+            }
+            else
+            {
+                UpdateStatusText.Text = $"v{_availableUpdate.Version} is available — click Update.";
+                UpdateButton.Content = "Update to " + _availableUpdate.Version;
+            }
+        }
+        catch (Exception ex)
+        {
+            UpdateStatusText.Text = $"Check failed: {ex.Message}";
+        }
+        finally
+        {
+            UpdateButton.IsEnabled = true;
+        }
+    }
 }

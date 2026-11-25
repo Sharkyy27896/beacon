@@ -1,7 +1,7 @@
 using System.Globalization;
+using System.Net;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using System.Web;
 using Beacon.Models;
 
 namespace Beacon.Services;
@@ -58,7 +58,10 @@ public static class PayloadParser
 
         // ---------- behaviour ----------
         var duration = Get(fields, "duration", "timeout", "displayFor", "showFor", "visibleFor", "seconds", "secs", "ms", "milliseconds");
-        payload.Duration = ParseDuration(duration) ?? TimeSpan.FromSeconds(Math.Max(0, settings.DefaultDurationSeconds));
+        payload.Duration = ParseDuration(duration) ??
+                           (settings.DefaultDurationSeconds > 0
+                               ? TimeSpan.FromSeconds(settings.DefaultDurationSeconds)
+                               : null);
         if (!duration.ValueKind.IsNullish())
         {
             var sticky = Get(fields, "sticky", "persistent", "waitForAction", "requireAction", "stay");
@@ -277,8 +280,8 @@ public static class PayloadParser
                 foreach (var pair in body.Split('&', StringSplitOptions.RemoveEmptyEntries))
                 {
                     var eq = pair.IndexOf('=');
-                    var key = HttpUtility.UrlDecode(eq < 0 ? pair : pair[..eq]);
-                    var value = HttpUtility.UrlDecode(eq < 0 ? "" : pair[(eq + 1)..]);
+                    var key = WebUtility.UrlDecode(eq < 0 ? pair : pair[..eq]);
+                    var value = WebUtility.UrlDecode(eq < 0 ? "" : pair[(eq + 1)..]);
                     if (!string.IsNullOrEmpty(key)) pairs[key] = value;
                 }
             foreach (var pair in request.Query)
@@ -374,13 +377,16 @@ public static class PayloadParser
     {
         if (el.ValueKind.IsNullish()) return null;
         if (el.ValueKind == JsonValueKind.Number)
-            return TimeSpan.FromSeconds(Math.Max(0, el.GetDouble()));
+        {
+            var seconds = el.GetDouble();
+            return seconds > 0 ? TimeSpan.FromSeconds(seconds) : null;
+        }
         if (el.ValueKind == JsonValueKind.True) return null;
         var value = Text(el)?.Trim().ToLowerInvariant() ?? "";
         if (value is "" or "0" or "never" or "sticky" or "forever" or "until dismissed" or "persistent" or "none")
             return null;
-        if (double.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out var seconds))
-            return TimeSpan.FromSeconds(Math.Max(0, seconds));
+        if (double.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out var parsedSeconds))
+            return parsedSeconds > 0 ? TimeSpan.FromSeconds(parsedSeconds) : null;
         var match = DurationPattern.Match(value);
         if (!match.Success) return null;
         var amount = double.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
@@ -389,7 +395,8 @@ public static class PayloadParser
             : unit.StartsWith("m") ? 60
             : unit.StartsWith("h") ? 3600
             : 1;
-        return TimeSpan.FromSeconds(Math.Max(0, amount * multiplier));
+        var result = TimeSpan.FromSeconds(amount * multiplier);
+        return result > TimeSpan.Zero ? result : null;
     }
 
     private static string? NormalizeHex(string? value)
