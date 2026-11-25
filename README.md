@@ -12,6 +12,8 @@
 
 </div>
 
+100% AI Generated!! Look I hate ai slop as much as the next guy but I find this app to be genuinely useful if you use muse.ai I personally use muse, and I find myself forgetting about it often, it'll get stuck on completing a captcha, or asking me for a verification code sent to my phone, and I wouldn't see it. This has has caused a lot of wasted tokens from the task expiring and it having to restart it, so I had OpenCode build this app. I take no credit for this application, nor do I claim to have built it myself, the original idea and concept / design was all curated and perfected by me, however I did not touch a single bit of code and I think disclosing that is the proper way to release a AI generated application. The following documentation and overview is AI generated as well. Anyway thank you for taking the time to read, as well for using this app! (Linux version is NOT complete and comes with many bugs, as far as I can tell the windows version is functioning as intended for the time being at least in my environment (tested on different devices and screen sizes) if you notice any bugs please let me know in the issues tab)
+
 Beacon is a tiny tray app that lets an AI agent (or any script) ask for your
 attention without assuming you are watching the screen. It listens for
 token-authenticated HTTP requests over a private Tailscale network and shows a
