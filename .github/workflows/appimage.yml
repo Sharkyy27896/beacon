@@ -39,7 +39,8 @@ jobs:
           cp -a publish/Beacon.Linux/. AppDir/usr/bin/
           chmod +x AppDir/usr/bin/Beacon
 
-          cp src/Beacon.Linux/Assets/beacon.png AppDir/usr/share/icons/hicolor/256x256/apps/beacon.png
+          cp src/Beacon.Linux/Assets/beacon-256.png AppDir/beacon.png
+          cp src/Beacon.Linux/Assets/beacon-256.png AppDir/usr/share/icons/hicolor/256x256/apps/beacon.png
 
           cat > AppDir/usr/share/applications/beacon.desktop <<'EOF'
           [Desktop Entry]
