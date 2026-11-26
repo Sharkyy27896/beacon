@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace Beacon.Services;
 
@@ -103,11 +104,14 @@ public static class PlatformServices
             foreach (var argument in arguments)
                 startInfo.ArgumentList.Add(argument);
 
-            using var process = Process.Start(startInfo);
+            var process = Process.Start(startInfo);
             if (process is null) return false;
-
-            _ = process.StandardOutput.ReadToEndAsync();
-            _ = process.StandardError.ReadToEndAsync();
+            var stdout = process.StandardOutput.ReadToEndAsync();
+            var stderr = process.StandardError.ReadToEndAsync();
+            // Dispose after the async readers complete instead of while they
+            // are still draining the redirected pipes.
+            _ = Task.WhenAll(stdout, stderr).ContinueWith(_ => process.Dispose(),
+                TaskScheduler.Default);
             return true;
         }
         catch

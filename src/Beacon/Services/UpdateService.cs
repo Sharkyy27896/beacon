@@ -2,17 +2,21 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
+using System.Reflection;
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace Beacon.Services;
 
-public sealed record UpdateInfo(string Version, string Tag, string AssetName, string DownloadUrl, string Notes);
+public sealed record UpdateInfo(string Version, string Tag, string AssetName, string DownloadUrl,
+    string Notes, string? Digest);
 
 /// <summary>
 /// Checks the GitHub Releases feed for a newer Beacon and applies it on demand.
-/// The repository is public by release time, so no credentials are required.
+/// The repository is public, so no credentials are required. Downgrades are not
+/// offered here; they require running an older setup manually and confirming it.
 /// </summary>
 public static class UpdateService
 {
@@ -38,6 +42,7 @@ public static class UpdateService
 
         var assetName = PreferredAssetName;
         string? downloadUrl = null;
+        string? digest = null;
         if (root.TryGetProperty("assets", out var assets))
         {
             foreach (var asset in assets.EnumerateArray())
@@ -45,15 +50,16 @@ public static class UpdateService
                 if (!string.Equals(asset.GetProperty("name").GetString(), assetName,
                         StringComparison.OrdinalIgnoreCase)) continue;
                 downloadUrl = asset.GetProperty("browser_download_url").GetString();
+                if (asset.TryGetProperty("digest", out var digestValue)) digest = digestValue.GetString();
                 break;
             }
         }
 
-        if (string.IsNullOrWhiteSpace(downloadUrl))
-            throw new InvalidOperationException($"Release {tag} does not contain {assetName}.");
+        // A release without this platform's asset is not an update for us.
+        if (string.IsNullOrWhiteSpace(downloadUrl)) return null;
 
         var notes = root.TryGetProperty("body", out var body) ? body.GetString() ?? "" : "";
-        return new UpdateInfo(latest, tag, assetName, downloadUrl, notes);
+        return new UpdateInfo(latest, tag, assetName, downloadUrl, notes, digest);
     }
 
     public static async Task<string> DownloadAndApplyAsync(UpdateInfo update,
@@ -61,10 +67,10 @@ public static class UpdateService
         CancellationToken cancellationToken = default)
     {
         // Windows installs normally live under Program Files, which a
-        // non-elevated app cannot write to. Stream the installer to a writable
-        // temp path with a real .exe name so ShellExecute can run it elevated.
-        // Linux keeps the running AppImage semantics: a sibling .new file that
-        // is chmod'ed and atomically moved over the current image.
+        // non-elevated app cannot write to. Stream the installer to a unique
+        // writable temp path with a real .exe name so ShellExecute can run it
+        // elevated. Linux keeps the running AppImage semantics: a sibling .new
+        // file that is chmod'ed and atomically moved over the current image.
         var windows = OperatingSystem.IsWindows();
         string? target = null;
         string pending;
@@ -73,7 +79,7 @@ public static class UpdateService
         {
             var tempDirectory = Path.Combine(Path.GetTempPath(), "Beacon");
             Directory.CreateDirectory(tempDirectory);
-            pending = Path.Combine(tempDirectory, "Beacon-Setup.exe");
+            pending = Path.Combine(tempDirectory, $"Beacon-Setup-{Guid.NewGuid():N}.exe");
         }
         else
         {
@@ -112,11 +118,13 @@ public static class UpdateService
                 await destination.FlushAsync(cancellationToken);
             }
 
+            VerifyDigest(pending, update.Digest);
+
             if (windows)
             {
                 // Tell the silent installer which install to repair. Without
                 // this it would default to Program Files and leave custom
-                // installs stale.
+                // installs stale. The installer refuses to downgrade silently.
                 var installDirectory = Path.GetDirectoryName(Environment.ProcessPath);
                 var arguments = string.IsNullOrWhiteSpace(installDirectory)
                     ? "/silent"
@@ -148,6 +156,20 @@ public static class UpdateService
         }
     }
 
+    /// <summary>GitHub publishes release asset hashes as "sha256:&lt;hex&gt;".</summary>
+    private static void VerifyDigest(string path, string? digest)
+    {
+        if (string.IsNullOrWhiteSpace(digest) ||
+            !digest.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase)) return;
+
+        var expected = digest[7..].Trim();
+        using var stream = File.OpenRead(path);
+        var actual = Convert.ToHexString(SHA256.HashData(stream));
+        if (!string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException(
+                "The downloaded update failed its SHA-256 checksum check and was not applied.");
+    }
+
     private static string GetTargetPath()
     {
         if (OperatingSystem.IsLinux())
@@ -171,26 +193,38 @@ public static class UpdateService
                 UseShellExecute = false,
                 CreateNoWindow = true
             });
-            process?.WaitForExit(5000);
+            if (process is null || !process.WaitForExit(5000) || process.ExitCode != 0)
+                throw new InvalidOperationException("Could not mark the downloaded AppImage executable.");
         }
+        catch (InvalidOperationException) { throw; }
         catch
         {
-            // The AppImage runtime may already mark the replacement executable.
+            throw new InvalidOperationException("Could not mark the downloaded AppImage executable.");
         }
     }
 
     private static HttpClient NewClient()
     {
         var client = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("Beacon/1.0.0");
+        var version = typeof(UpdateService).Assembly
+                          .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+                      ?? "1.0.1";
+        client.DefaultRequestHeaders.UserAgent.ParseAdd($"Beacon/{version}");
         client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
         return client;
     }
 
     private static bool IsNewer(string latest, string current)
     {
-        if (!Version.TryParse(latest, out var latestVersion) ||
-            !Version.TryParse(current, out var currentVersion)) return false;
+        // GitHub tags may carry prerelease/build suffixes that Version rejects.
+        static string NumericPart(string value)
+        {
+            var cut = value.IndexOfAny(new[] { '-', '+' });
+            return cut < 0 ? value : value[..cut];
+        }
+
+        if (!Version.TryParse(NumericPart(latest), out var latestVersion) ||
+            !Version.TryParse(NumericPart(current), out var currentVersion)) return false;
         return latestVersion > currentVersion;
     }
 }

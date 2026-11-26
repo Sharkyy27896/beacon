@@ -71,4 +71,24 @@ public sealed class NotificationPayload
     public int WaitTimeoutSeconds { get; set; } = 300;
 
     public bool IsSticky => Duration is null;
+
+    /// <summary>Copy used when the tray re-opens a dismissed notification.</summary>
+    public NotificationPayload Clone()
+    {
+        var copy = (NotificationPayload)MemberwiseClone();
+        copy.Actions = Actions.Select(action => new NotificationAction
+        {
+            Label = action.Label,
+            Url = action.Url,
+            CopyText = action.CopyText,
+            ReplyValue = action.ReplyValue,
+            Primary = action.Primary,
+            IsApprove = action.IsApprove,
+            IsDeny = action.IsDeny
+        }).ToList();
+        copy.Details = new List<KeyValuePair<string, string>>(Details);
+        copy.Arguments = new List<string>(Arguments);
+        copy.ReplyHeaders = new Dictionary<string, string>(ReplyHeaders, StringComparer.OrdinalIgnoreCase);
+        return copy;
+    }
 }

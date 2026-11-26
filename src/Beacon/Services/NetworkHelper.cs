@@ -30,6 +30,13 @@ public static class NetworkHelper
         return "127.0.0.1";
     }
 
+    /// <summary>
+    /// Host to advertise in setup instructions. Loopback bindings must never
+    /// show a LAN/Tailscale address that cannot reach the listener.
+    /// </summary>
+    public static string GetAdvertisedAddress(bool loopback) =>
+        loopback ? "127.0.0.1" : GetReachableAddress();
+
     public static bool IsValidHexColor(string? value) =>
         value is not null && System.Text.RegularExpressions.Regex.IsMatch(value.TrimStart('#'), "^[0-9a-fA-F]{6}$");
 }

@@ -6,7 +6,7 @@
 
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20%2B%20Linux-2EA043?style=flat-square)
 ![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square&logo=dotnet)
-![Version](https://img.shields.io/badge/version-1.0.0-2EA043?style=flat-square)
+![Version](https://img.shields.io/badge/version-1.0.1-2EA043?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-0969DA?style=flat-square&logo=git)
 
 </div>
@@ -61,6 +61,10 @@ streaming responses, and human-in-the-loop approval for admin commands.
   `Beacon-Setup.exe` installer, or a native Avalonia Linux AppImage.
 - **One-click updater** — settings has a **Check for updates** button that uses the
   GitHub Releases feed (no installer browsing required).
+- **Re-open last notification** — the tray menu can bring back the most recent popup
+  if you dismissed it. Reply and shell prompts are never re-armed this way.
+- **Confirmed downgrade** — the installer asks before replacing a newer installation;
+  silent one-click updates never downgrade.
 - **Never disruptive** — Beacon never closes or restarts Tailscale, Stremio,
   other apps, or the computer.
 
@@ -85,7 +89,7 @@ sequenceDiagram
 1. Run `Beacon-Setup.exe` on the target Windows PC, approve the UAC prompt, and
    allow the app through the firewall when prompted. The installer uses the same
    dark theme as Beacon and preserves your existing settings. If Beacon is already
-   installed, a **Repair** button appears; use it to reinstall at 1.0.0.
+   installed, a **Repair** button appears; use it to reinstall at 1.0.1.
 2. **Advanced options** in the installer lets you change the installation folder and
    the app-data folder before installing. By default these are
    `C:\Program Files\Beacon` and `%APPDATA%\Beacon`.

@@ -47,6 +47,8 @@ public sealed record InstallOptions(string InstallDirectory, string DataDirector
 public sealed record InstallState(
     bool Found,
     Version? Version,
+    bool IsMsi,
+    string? ProductCode,
     string? Executable,
     string InstallDirectory);
 
@@ -56,8 +58,8 @@ public sealed record InstallState(
 /// </summary>
 public static class InstallerEngine
 {
-    public const string TargetVersionText = "1.0.0";
-    public static readonly Version TargetVersion = new(1, 0, 0);
+    public const string TargetVersionText = "1.0.1";
+    public static readonly Version TargetVersion = new(1, 0, 1);
 
     private const string UninstallKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Beacon";
 
@@ -76,12 +78,21 @@ public static class InstallerEngine
 
         try
         {
-            using var key = Registry.LocalMachine.OpenSubKey(UninstallKey);
-            var location = key?.GetValue("InstallLocation") as string;
-            if (!string.IsNullOrWhiteSpace(location))
+            foreach (var (root, subKey) in UninstallRoots())
             {
-                var full = Path.GetFullPath(Environment.ExpandEnvironmentVariables(location));
-                if (File.Exists(Path.Combine(full, "Beacon.exe"))) return full;
+                using var key = root.OpenSubKey(subKey);
+                if (key is null) continue;
+                foreach (var name in key.GetSubKeyNames())
+                {
+                    using var child = key.OpenSubKey(name);
+                    if (child is null) continue;
+                    if (!string.Equals(child.GetValue("DisplayName") as string, "Beacon",
+                            StringComparison.OrdinalIgnoreCase)) continue;
+                    var location = child.GetValue("InstallLocation") as string;
+                    if (string.IsNullOrWhiteSpace(location)) continue;
+                    var full = Path.GetFullPath(Environment.ExpandEnvironmentVariables(location));
+                    if (File.Exists(Path.Combine(full, "Beacon.exe"))) return full;
+                }
             }
         }
         catch
@@ -104,6 +115,10 @@ public static class InstallerEngine
             if (Version.TryParse(info.FileVersion, out var parsed)) version = parsed;
         }
 
+        string? productCode = null;
+        var isMsi = false;
+        var expectedDirectory = NormalizeDirectory(options.InstallDirectory);
+
         foreach (var (root, subKey) in UninstallRoots())
         {
             using var key = root.OpenSubKey(subKey);
@@ -116,29 +131,54 @@ public static class InstallerEngine
                 if (!string.Equals(child.GetValue("DisplayName") as string, "Beacon",
                         StringComparison.OrdinalIgnoreCase)) continue;
 
+                // Only trust rows that point at this destination. A stale row
+                // for a different folder must not block install or downgrade.
+                var location = child.GetValue("InstallLocation") as string;
+                var matches = string.IsNullOrWhiteSpace(location)
+                    ? exists
+                    : string.Equals(NormalizeDirectory(location), expectedDirectory,
+                        StringComparison.OrdinalIgnoreCase);
+                if (!matches) continue;
+
                 if (version is null && child.GetValue("DisplayVersion") is string v &&
                     Version.TryParse(v, out var fromRegistry)) version = fromRegistry;
+
+                var uninstall = child.GetValue("UninstallString") as string ?? "";
+                if (uninstall.Contains("msiexec", StringComparison.OrdinalIgnoreCase))
+                {
+                    isMsi = true;
+                    productCode = name;
+                }
             }
         }
 
-        return new InstallState(exists || version is not null, version,
-            exists ? exe : null, options.InstallDirectory);
+        return new InstallState(exists || version is not null, version, isMsi,
+            productCode, exists ? exe : null, options.InstallDirectory);
     }
 
+    /// <summary>
+    /// <paramref name="allowDowngrade"/> is only set by the installer's explicit
+    /// confirmation dialog. Silent repair paths never downgrade on their own.
+    /// </summary>
     public static void Install(InstallOptions options, IProgress<(int Value, string Text)> progress,
-        bool repair = false)
+        bool repair = false, bool allowDowngrade = false)
     {
-        var verb = repair ? "Repairing" : "Installing";
-
         progress.Report((4, "Checking existing installation..."));
         var state = Detect(options);
 
-        if (state.Found && state.Version is not null && state.Version > TargetVersion)
+        if (state.Found && state.Version is not null && state.Version > TargetVersion && !allowDowngrade)
             throw new InvalidOperationException(
-                "A newer version of Beacon is already installed. This installer will not replace it.");
+                "A newer version of Beacon is already installed. Confirm the downgrade in the installer to continue.");
 
         progress.Report((10, "Closing any running Beacon window..."));
         StopBeacon();
+
+        if (state.Found && state.Version is not null && state.Version > TargetVersion && allowDowngrade)
+        {
+            progress.Report((16, "Removing the newer installation..."));
+            RemovePreviousMsi(state);
+            RemoveStaleUninstallEntries();
+        }
 
         var temp = Path.Combine(Path.GetTempPath(), "beacon-setup-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(temp);
@@ -173,7 +213,7 @@ public static class InstallerEngine
 
             progress.Report((86, "Registering installation..."));
             Register(options);
-            progress.Report((100, repair ? "Repair complete." : "Beacon 1.0.0 is ready."));
+            progress.Report((100, repair ? "Repair complete." : "Beacon 1.0.1 is ready."));
         }
         finally
         {
@@ -200,10 +240,36 @@ public static class InstallerEngine
             Environment.GetFolderPath(Environment.SpecialFolder.CommonPrograms), "Beacon.lnk");
         try { if (File.Exists(shortcut)) File.Delete(shortcut); } catch { /* best effort */ }
 
-        try { Registry.LocalMachine.DeleteSubKeyTree(UninstallKey, throwOnMissingSubKey: false); }
-        catch { /* best effort */ }
+        // Older builds registered Beacon in different hives with different key
+        // names. Remove every matching row so a stale entry cannot masquerade
+        // as a newer installed version on the next run.
+        foreach (var (root, subKey) in UninstallRoots())
+        {
+            using var key = root.OpenSubKey(subKey, writable: true);
+            if (key is null) continue;
+            foreach (var name in key.GetSubKeyNames())
+            {
+                using var child = key.OpenSubKey(name);
+                if (child is null) continue;
+                var display = child.GetValue("DisplayName") as string;
+                var location = child.GetValue("InstallLocation") as string;
+                var isBeacon = string.Equals(display, "Beacon", StringComparison.OrdinalIgnoreCase) ||
+                               (!string.IsNullOrWhiteSpace(location) &&
+                                string.Equals(NormalizeDirectory(location),
+                                    NormalizeDirectory(options.InstallDirectory),
+                                    StringComparison.OrdinalIgnoreCase));
+                if (!isBeacon) continue;
+                try { key.DeleteSubKeyTree(name, throwOnMissingSubKey: false); } catch { /* best effort */ }
+            }
+        }
 
         progress.Report((100, "Beacon was removed."));
+    }
+
+    private static string NormalizeDirectory(string path)
+    {
+        var full = Path.GetFullPath(Environment.ExpandEnvironmentVariables(path));
+        return full.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
     }
 
     private static IEnumerable<(RegistryKey Root, string SubKey)> UninstallRoots()
@@ -220,6 +286,46 @@ public static class InstallerEngine
         {
             try { process.Kill(entireProcessTree: true); } catch { /* already exiting */ }
             finally { process.Dispose(); }
+        }
+    }
+
+    private static void RemovePreviousMsi(InstallState state)
+    {
+        if (!state.IsMsi || string.IsNullOrWhiteSpace(state.ProductCode)) return;
+        try
+        {
+            var start = new ProcessStartInfo("msiexec.exe",
+                $"/x {state.ProductCode} /qn /norestart")
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            using var process = Process.Start(start);
+            process?.WaitForExit(180_000);
+        }
+        catch
+        {
+            // If the silent removal fails, the file copy below simply replaces
+            // the binaries and our registry entry takes precedence.
+        }
+    }
+
+    private static void RemoveStaleUninstallEntries()
+    {
+        foreach (var (root, subKey) in UninstallRoots())
+        {
+            using var key = root.OpenSubKey(subKey, writable: true);
+            if (key is null) continue;
+            foreach (var name in key.GetSubKeyNames())
+            {
+                if (string.Equals(name, "Beacon", StringComparison.OrdinalIgnoreCase)) continue;
+                using var child = key.OpenSubKey(name);
+                if (string.Equals(child?.GetValue("DisplayName") as string, "Beacon",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    try { key.DeleteSubKeyTree(name, throwOnMissingSubKey: false); } catch { /* best effort */ }
+                }
+            }
         }
     }
 

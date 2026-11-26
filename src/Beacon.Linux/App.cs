@@ -25,7 +25,7 @@ public sealed class App : Application
 
     public static string AppVersion { get; } =
         typeof(App).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
-        ?? typeof(App).Assembly.GetName().Version?.ToString() ?? "1.0.0";
+        ?? typeof(App).Assembly.GetName().Version?.ToString() ?? "1.0.1";
 
     public AppSettings Settings { get; private set; } = new();
     public HttpServer Server { get; } = new();
@@ -103,6 +103,7 @@ public sealed class App : Application
             {
                 new NativeMenuItem("Open settings") { Command = new RelayCommand(OpenSettings) },
                 new NativeMenuItem("Send test notification") { Command = new RelayCommand(SendTestNotification) },
+                new NativeMenuItem("Re-open last notification") { Command = new RelayCommand(ReopenLastNotification) },
                 new NativeMenuItem("Dismiss current popup") { Command = new RelayCommand(() => _manager.ClearAll()) },
                 new NativeMenuItemSeparator(),
                 new NativeMenuItem("Start / stop listener") { Command = new RelayCommand(ToggleListener) },
@@ -129,12 +130,14 @@ public sealed class App : Application
         RefreshTrayText();
     }
 
+    private void ReopenLastNotification() => _manager.ReopenLast();
+
     private void ShowStartupStatus()
     {
         _manager.Enqueue(new NotificationPayload
         {
             Title = "Beacon is running",
-            Message = $"Listening on http://{NetworkHelper.GetReachableAddress()}:{Settings.Port}/notify",
+            Message = $"Listening on http://{NetworkHelper.GetAdvertisedAddress(Settings.BindAddress == "Loopback")}:{Settings.Port}/notify",
             Kind = NotificationKind.Success,
             Source = "Beacon",
             Category = "Connection check",
@@ -233,6 +236,9 @@ public sealed class App : Application
 
         if (path is "/shell" or "/exec" or "/run" or "/admin" or "/command")
         {
+            // Authenticate first so a disabled switch cannot be probed without
+            // the token, and so unauthenticated callers always get 401.
+            if (!IsAuthorized(request)) return Task.FromResult(Unauthorized());
             if (!Settings.AllowShell)
                 return Task.FromResult(HttpResponse.Json(403, new
                 {
@@ -299,6 +305,16 @@ public sealed class App : Application
 
             var payload = PayloadParser.Parse(request with { Body = enriched }, Settings);
             if (forcedMode != InteractionMode.None) payload.Mode = forcedMode;
+
+            // Body-driven shell mode must respect the same off switch as the
+            // /shell route family.
+            if (payload.Mode == InteractionMode.Shell && !Settings.AllowShell)
+                return HttpResponse.Json(403, new
+                {
+                    ok = false,
+                    error = "Shell requests are disabled in Beacon settings."
+                });
+
             if (payload.Mode == InteractionMode.Shell) payload.Kind = NotificationKind.Shell;
             if (payload.Mode == InteractionMode.Reply && payload.Kind == NotificationKind.Info)
                 payload.Kind = NotificationKind.Question;

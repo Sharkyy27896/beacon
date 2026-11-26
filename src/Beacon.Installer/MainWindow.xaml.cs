@@ -33,7 +33,13 @@ public partial class MainWindow : Window
 
     private void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
-        _options = InstallOptions.FromInstallDirectory(InstallOptions.Default.InstallDirectory);
+        // A custom install is not under Program Files; detect it before showing
+        // "Not installed" or defaulting a repair to the wrong folder.
+        var detected = InstallerEngine.DetectCurrentInstallDirectory();
+        var installDirectory = string.IsNullOrWhiteSpace(detected)
+            ? InstallOptions.Default.InstallDirectory
+            : detected;
+        _options = InstallOptions.FromInstallDirectory(installDirectory);
         _state = InstallerEngine.Detect(_options);
 
         InstallPathBox.Text = _options.InstallDirectory;
@@ -77,6 +83,21 @@ public partial class MainWindow : Window
         _options = new InstallOptions(
             Path.GetFullPath(Environment.ExpandEnvironmentVariables(installDirectory)),
             Path.GetFullPath(Environment.ExpandEnvironmentVariables(dataDirectory)));
+        _state = InstallerEngine.Detect(_options);
+        InstalledText.Text = _state.Found
+            ? _state.Version?.ToString() ?? "installed"
+            : "Not installed";
+
+        var allowDowngrade = false;
+        if (_state.Found && _state.Version is not null && _state.Version > InstallerEngine.TargetVersion)
+        {
+            var confirm = new DowngradeConfirmWindow(_state.Version, InstallerEngine.TargetVersion)
+            {
+                Owner = this
+            };
+            if (confirm.ShowDialog() != true) return;
+            allowDowngrade = true;
+        }
 
         _busy = true;
         RepairButton.IsEnabled = false;
@@ -96,11 +117,11 @@ public partial class MainWindow : Window
         try
         {
             await System.Threading.Tasks.Task.Run(() =>
-                InstallerEngine.Install(_options, progress, repair));
+                InstallerEngine.Install(_options, progress, repair, allowDowngrade));
 
             _done = true;
             Headline.Text = repair ? "Repair complete" : "Beacon is ready";
-            StatusText.Text = repair ? "Beacon was reinstalled at 1.0.0." : "Beacon 1.0.0 is ready.";
+            StatusText.Text = repair ? "Beacon was reinstalled at 1.0.1." : "Beacon 1.0.1 is ready.";
             PercentText.Text = "100%";
             CancelButton.Visibility = Visibility.Collapsed;
             RepairButton.Visibility = Visibility.Collapsed;

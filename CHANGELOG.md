@@ -3,6 +3,24 @@
 All notable changes to Beacon are documented here. Versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [1.0.1]
+
+### Added
+- Tray action **Re-open last notification** on Windows and Linux. It re-shows the most
+  recent ordinary popup without re-arming a pending reply or shell approval.
+- Installer confirmation dialog when a newer Beacon version is already installed.
+  Continuing performs the downgrade and cleans up stale uninstall registrations;
+  silent one-click updates never downgrade.
+
+### Changed
+- Version metadata, installer UI, API sample and updater user agent now report `1.0.1`.
+
+### Fixed
+- The installer re-detects the destination after Advanced options change it, so the
+  displayed current version and downgrade check match the actual install folder.
+
+---
+
 ## [1.0.0] — first public release
 
 ### Added

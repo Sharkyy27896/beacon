@@ -168,7 +168,17 @@ public sealed class NotificationWindow : Window
     /// External dismissal (tray "clear"): suppress the Closed interaction
     /// completion without treating the close as a user decision.
     /// </summary>
-    public void CancelInteraction() => _cancelInteraction = true;
+    public void CancelInteraction()
+    {
+        _cancelInteraction = true;
+        // Complete the pending HTTP request instead of leaving wait:true callers
+        // blocked until the full timeout after a tray-side clear.
+        _ = CompleteOnceAsync(new InteractionResult
+        {
+            Kind = "cancelled",
+            Label = "Dismissed"
+        });
+    }
 
     protected override void OnClosed(EventArgs e)
     {
@@ -337,19 +347,28 @@ public sealed class NotificationWindow : Window
         _messageHost = new Border { Margin = new Thickness(0, 14, 0, 0) };
         cardContent.Children.Add(_messageHost);
 
-        // Code panel.
+        // Code panel. A shell prompt must always show the exact command, even
+        // when the same payload also carries a code/OTP field.
+        var hasCommand = _payload.Mode == InteractionMode.Shell &&
+                         !string.IsNullOrWhiteSpace(_payload.Command);
         var codeLabel = new TextBlock
         {
-            Text = string.IsNullOrWhiteSpace(_payload.CodeLabel) ? "Verification code" : _payload.CodeLabel!,
+            Text = hasCommand && !string.IsNullOrWhiteSpace(_payload.Code)
+                ? "Command and verification code"
+                : hasCommand
+                    ? "Command to run"
+                    : string.IsNullOrWhiteSpace(_payload.CodeLabel) ? "Verification code" : _payload.CodeLabel!,
             FontSize = 11,
             Foreground = muted,
             Margin = new Thickness(0, 0, 0, 6)
         };
         var codeText = new TextBlock
         {
-            Text = _payload.Code ?? _payload.Command ?? "",
+            Text = hasCommand && !string.IsNullOrWhiteSpace(_payload.Code)
+                ? $"Command: {_payload.Command}\nCode: {_payload.Code}"
+                : hasCommand ? _payload.Command! : _payload.Code ?? "",
             FontFamily = new FontFamily("Consolas, Monaco, monospace"),
-            FontSize = 16,
+            FontSize = hasCommand ? 12 : 16,
             FontWeight = FontWeight.SemiBold,
             Foreground = BrushFromHex(_accentHex),
             TextWrapping = TextWrapping.Wrap
@@ -739,6 +758,7 @@ public sealed class NotificationWindow : Window
             _payload.Mode == InteractionMode.None ? "Dismiss" : "Cancel",
             primary: false);
         _cancelButton.Click += (_, _) => Dismiss();
+        _cancelButton.IsVisible = _payload.Dismissible || _payload.Mode != InteractionMode.None;
         _actionPanel.Children.Add(_cancelButton);
         _gatedControls.Add(_cancelButton);
 
@@ -972,7 +992,9 @@ public sealed class NotificationWindow : Window
     private void CountdownTick(object? sender, EventArgs e)
     {
         UpdateCountdown();
-        if (DateTime.Now >= _expiresAt) ClosePopup();
+        // dismissible:false means "keep until cleared", including auto-dismiss.
+        if (DateTime.Now >= _expiresAt && (_payload.Dismissible || _payload.Mode != InteractionMode.None))
+            ClosePopup();
     }
 
     private void UpdateCountdown()
@@ -1079,6 +1101,7 @@ public sealed class NotificationWindow : Window
     private void Dismiss()
     {
         if (!_unlocked || _closing) return;
+        if (_payload.Mode == InteractionMode.None && !_payload.Dismissible && !_replySent) return;
         _ = CompleteOnceAsync(new InteractionResult
         {
             Kind = "cancelled",

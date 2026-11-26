@@ -25,3 +25,14 @@ jobs:
 
       - name: Publish (self-contained win-x64)
         run: dotnet publish src/Beacon/Beacon.csproj -c Release -r win-x64 --self-contained true -o publish/Beacon --no-restore
+
+      - name: Build themed installer
+        shell: pwsh
+        run: ./tools/build_installer.ps1
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Beacon-Setup
+          path: Beacon-Setup.exe
+          if-no-files-found: error

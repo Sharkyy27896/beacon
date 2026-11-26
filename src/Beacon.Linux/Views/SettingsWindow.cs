@@ -79,12 +79,12 @@ public sealed class SettingsWindow : Window
     {
         Title = "Beacon settings";
         Width = 720;
-        Height = 760;
-        MinWidth = 720;
-        MaxWidth = 720;
-        MinHeight = 760;
-        MaxHeight = 760;
-        CanResize = false;
+        Height = 680;
+        MinWidth = 560;
+        MinHeight = 520;
+        MaxWidth = 1200;
+        MaxHeight = 1000;
+        CanResize = true;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         Background = WindowBrush;
 
@@ -113,6 +113,7 @@ public sealed class SettingsWindow : Window
         WireSelectAll(_tokenBox);
         WireSelectAll(_durationBox);
         _portBox.TextChanged += (_, _) => UpdateUrl();
+        _bindCombo.SelectionChanged += (_, _) => UpdateUrl();
 
         Content = BuildContent();
         UpdateUrl();
@@ -605,7 +606,8 @@ public sealed class SettingsWindow : Window
         {
             _app.RestartListener();
             RefreshStatus();
-            _hintText.Text = "Saved · listener restarted";
+            _hintText.Text = "Saved · listener restarted" +
+                (autostartFailed ? " · session autostart unavailable" : "");
             return true;
         }
 
@@ -719,7 +721,8 @@ public sealed class SettingsWindow : Window
     private void UpdateUrl()
     {
         if (!int.TryParse(_portBox.Text?.Trim(), out var port)) port = 8765;
-        _urlBox.Text = $"http://{NetworkHelper.GetReachableAddress()}:{port}/notify";
+        var loopback = _bindCombo.SelectedIndex == 1 || _app.Settings.BindAddress == "Loopback";
+        _urlBox.Text = $"http://{NetworkHelper.GetAdvertisedAddress(loopback)}:{port}/notify";
     }
 
     private void RefreshStatus()

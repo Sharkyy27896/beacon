@@ -23,7 +23,7 @@ public partial class App : Application
 
     public static string AppVersion { get; } =
         typeof(App).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
-        ?? typeof(App).Assembly.GetName().Version?.ToString() ?? "1.0.0";
+        ?? typeof(App).Assembly.GetName().Version?.ToString() ?? "1.0.1";
 
     public AppSettings Settings { get; private set; } = new();
     public HttpServer Server { get; } = new();
@@ -72,7 +72,7 @@ public partial class App : Application
             OpenSettings();
         else if (!args.Contains("--minimized"))
             _tray.ShowBalloonTip(3500, "Beacon is running",
-                $"Listening on http://{NetworkHelper.GetReachableAddress()}:{Settings.Port}/notify", ToolTipIcon.Info);
+                $"Listening on http://{NetworkHelper.GetAdvertisedAddress(Settings.BindAddress == "Loopback")}:{Settings.Port}/notify", ToolTipIcon.Info);
     }
 
     protected override void OnExit(ExitEventArgs e)
@@ -101,6 +101,7 @@ public partial class App : Application
         menu.ForeColor = Color.FromArgb(230, 240, 255);
         menu.Items.Add(new ToolStripMenuItem("Open settings", null, (_, _) => OpenSettings()));
         menu.Items.Add(new ToolStripMenuItem("Send test notification", null, (_, _) => SendTestNotification()));
+        menu.Items.Add(new ToolStripMenuItem("Re-open last notification", null, (_, _) => ReopenLastNotification()));
         menu.Items.Add(new ToolStripMenuItem("Dismiss current popup", null, (_, _) => _manager.ClearAll()));
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(new ToolStripMenuItem("Start / stop listener", null, (_, _) =>
@@ -175,6 +176,17 @@ public partial class App : Application
         });
     }
 
+    private void ReopenLastNotification()
+    {
+        if (_manager.ReopenLast()) return;
+        try
+        {
+            _tray.ShowBalloonTip(2500, "Nothing to re-open",
+                "Beacon has not shown a notification yet.", ToolTipIcon.Info);
+        }
+        catch { /* tray may not be ready */ }
+    }
+
     private Task<HttpResponse> OnRequest(HttpRequestData request)
     {
         if (request.Method == "OPTIONS")
@@ -198,6 +210,9 @@ public partial class App : Application
 
         if (path is "/shell" or "/exec" or "/run" or "/admin" or "/command")
         {
+            // Authenticate first so unauthenticated callers always get 401 and
+            // cannot probe whether the shell switch is enabled.
+            if (!IsAuthorized(request)) return Task.FromResult(Unauthorized());
             if (!Settings.AllowShell)
                 return Task.FromResult(HttpResponse.Json(403, new
                 {
@@ -265,6 +280,17 @@ public partial class App : Application
 
             var payload = PayloadParser.Parse(request with { Body = enriched }, Settings);
             if (forcedMode != InteractionMode.None) payload.Mode = forcedMode;
+
+            // The body can also request shell mode (PayloadParser detects the
+            // "command" field), so the global off switch must be enforced here
+            // too — not just on the /shell URL family.
+            if (payload.Mode == InteractionMode.Shell && !Settings.AllowShell)
+                return HttpResponse.Json(403, new
+                {
+                    ok = false,
+                    error = "Shell requests are disabled in Beacon settings."
+                });
+
             if (payload.Mode == InteractionMode.Shell) payload.Kind = NotificationKind.Shell;
             if (payload.Mode == InteractionMode.Reply && payload.Kind == NotificationKind.Info)
                 payload.Kind = NotificationKind.Question;

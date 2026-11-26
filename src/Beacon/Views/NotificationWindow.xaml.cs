@@ -153,16 +153,19 @@ public partial class NotificationWindow : Window
         }
         SourceText.Text = string.IsNullOrWhiteSpace(_payload.Source) ? "" : $"from {_payload.Source}";
 
+        var hasCommand = _payload.Mode == InteractionMode.Shell &&
+                         !string.IsNullOrWhiteSpace(_payload.Command);
         if (_payload.Mode == InteractionMode.Shell)
         {
             WarningBanner.Visibility = Visibility.Visible;
             WarningText.Text = _payload.Elevated
                 ? "This will run with administrator privileges. Windows may show a UAC prompt — only approve if you trust this request."
                 : "This will run with your current user rights. Only approve if you trust this request.";
-            if (string.IsNullOrWhiteSpace(_payload.Code))
+            if (hasCommand)
             {
                 CodePanel.Visibility = Visibility.Visible;
                 CodeLabel.Text = "Command to run";
+                CodeText.FontSize = 15;
                 CodeText.Text = _payload.Command ?? "";
                 CopyCodeButton.Background = BrushFromHex(theme.Accent, 230);
                 CopyCodeButton.Foreground = new SolidColorBrush(Color.FromRgb(8, 14, 26));
@@ -179,8 +182,20 @@ public partial class NotificationWindow : Window
         if (!string.IsNullOrWhiteSpace(_payload.Code))
         {
             CodePanel.Visibility = Visibility.Visible;
-            CodeLabel.Text = string.IsNullOrWhiteSpace(_payload.CodeLabel) ? "Verification code" : _payload.CodeLabel;
-            CodeText.Text = _payload.Code;
+            if (hasCommand)
+            {
+                // Never hide the command being approved just because the
+                // payload also carries a code/OTP field.
+                CodeLabel.Text = "Command and verification code";
+                CodeText.FontSize = 15;
+                CodeText.Text = $"Command: {_payload.Command}\nCode: {_payload.Code}";
+            }
+            else
+            {
+                CodeLabel.Text = string.IsNullOrWhiteSpace(_payload.CodeLabel) ? "Verification code" : _payload.CodeLabel;
+                CodeText.FontSize = 30;
+                CodeText.Text = _payload.Code;
+            }
             CopyCodeButton.Background = BrushFromHex(theme.Accent, 230);
             CopyCodeButton.Foreground = new SolidColorBrush(Color.FromRgb(8, 14, 26));
             CopyCodeButton.BorderBrush = _accent;
@@ -250,7 +265,10 @@ public partial class NotificationWindow : Window
         {
             Content = _payload.Mode == InteractionMode.None ? "Dismiss" : "Cancel",
             Style = (Style)FindResource("PillButton"),
-            Name = "CancelButton"
+            Name = "CancelButton",
+            Visibility = _payload.Dismissible || _payload.Mode != InteractionMode.None
+                ? Visibility.Visible
+                : Visibility.Collapsed
         };
         AutomationProperties.SetAutomationId(_cancelButton, "CancelButton");
         _cancelButton.Click += DismissButton_Click;
@@ -359,7 +377,10 @@ public partial class NotificationWindow : Window
 
     private void CountdownTick(object? sender, EventArgs e)
     {
-        if (DateTime.Now >= _expiresAt) CloseWithAnimation();
+        if (DateTime.Now < _expiresAt) return;
+        // dismissible:false keeps a plain popup until it is explicitly cleared.
+        if (_payload.Mode == InteractionMode.None && !_payload.Dismissible && !_replySent) return;
+        CloseWithAnimation();
     }
 
     /// <summary>
@@ -724,6 +745,7 @@ public partial class NotificationWindow : Window
     private void DismissButton_Click(object sender, RoutedEventArgs e)
     {
         if (!_unlocked) return;
+        if (_payload.Mode == InteractionMode.None && !_payload.Dismissible && !_replySent) return;
         CancelInteraction();
         CloseWithAnimation();
     }

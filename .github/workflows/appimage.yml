@@ -19,7 +19,7 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
-      # Version stays 1.0.0 as defined in the csproj; nothing here overrides it.
+      # Version stays 1.0.1 as defined in the csproj; nothing here overrides it.
       - name: Restore
         run: dotnet restore src/Beacon.Linux/Beacon.Linux.csproj -r linux-x64
 

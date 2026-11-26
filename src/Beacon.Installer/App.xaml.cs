@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
@@ -19,8 +20,7 @@ public partial class App : Application
             // Silent path used by the copied Beacon-Uninstall.exe. No UI is shown.
             var progress = new Progress<(int Value, string Text)>(_ => { });
             var options = InstallOptions.FromInstallDirectory(ResolveInstallDirectory(e.Args));
-            _ = Task.Run(() => InstallerEngine.Uninstall(options, progress))
-                .ContinueWith(_ => Dispatcher.Invoke(Shutdown));
+            RunSilent(() => InstallerEngine.Uninstall(options, progress));
             return;
         }
 
@@ -29,15 +29,39 @@ public partial class App : Application
             a.Equals("/S", StringComparison.OrdinalIgnoreCase));
         if (silent)
         {
-            // Used by Beacon's one-click updater. No UI is shown.
+            // Used by Beacon's one-click updater. No UI is shown, and downgrades
+            // are refused unless an explicit flag is supplied by a confirmed UI.
             var progress = new Progress<(int Value, string Text)>(_ => { });
             var options = InstallOptions.FromInstallDirectory(ResolveInstallDirectory(e.Args));
-            _ = Task.Run(() => InstallerEngine.Install(options, progress, repair: true))
-                .ContinueWith(_ => Dispatcher.Invoke(Shutdown));
+            RunSilent(() => InstallerEngine.Install(options, progress, repair: true));
             return;
         }
 
         base.OnStartup(e);
+    }
+
+    /// <summary>
+    /// Silent callers get no dialog, so failures must be logged and reported
+    /// through the exit code instead of vanishing into a discarded task.
+    /// </summary>
+    private void RunSilent(Action action)
+    {
+        _ = Task.Run(action).ContinueWith(task =>
+        {
+            if (task.IsFaulted)
+            {
+                try
+                {
+                    var directory = Path.Combine(Path.GetTempPath(), "Beacon");
+                    Directory.CreateDirectory(directory);
+                    File.AppendAllText(Path.Combine(directory, "setup.log"),
+                        $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {task.Exception}\n\n");
+                }
+                catch { /* logging is best effort */ }
+                Environment.ExitCode = 1;
+            }
+            Dispatcher.Invoke(Shutdown);
+        });
     }
 
     /// <summary>

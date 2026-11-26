@@ -64,7 +64,8 @@ public partial class SettingsWindow : Window
     private void UpdateUrl()
     {
         if (!int.TryParse(PortBox.Text.Trim(), out var port)) port = 8765;
-        UrlBox.Text = $"http://{NetworkHelper.GetReachableAddress()}:{port}/notify";
+        var loopback = BindCombo.SelectedIndex == 1 || _app.Settings.BindAddress == "Loopback";
+        UrlBox.Text = $"http://{NetworkHelper.GetAdvertisedAddress(loopback)}:{port}/notify";
     }
 
     private void RefreshStatus()
@@ -94,6 +95,9 @@ public partial class SettingsWindow : Window
             return false;
         }
 
+        var previousPort = _app.Settings.Port;
+        var previousBind = _app.Settings.BindAddress;
+
         _app.Settings.Port = port;
         _app.Settings.BindAddress = BindCombo.SelectedIndex == 1 ? "Loopback" : "Any";
         _app.Settings.RequireAuth = AuthCheck.IsChecked == true;
@@ -105,6 +109,9 @@ public partial class SettingsWindow : Window
         _app.Settings.Use24HourClock = ClockCombo.SelectedIndex != 1;
         _settingsService.Save(_app.Settings);
         _app.NotifySettingsChanged();
+        if (port != previousPort ||
+            !string.Equals(_app.Settings.BindAddress, previousBind, StringComparison.OrdinalIgnoreCase))
+            _app.RestartListener();
         SetAutoStart(_app.Settings.StartWithWindows);
         TokenBox.Text = _app.Settings.Token;
         UpdateUrl();

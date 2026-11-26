@@ -57,7 +57,9 @@ public sealed class ChatService
 
             if (existing is not null)
             {
-                existing.Text = string.IsNullOrEmpty(text) ? ThinkingText : text;
+                // A second reply must not erase text Muse is still streaming.
+                if (string.IsNullOrEmpty(existing.Text) || existing.Text == ThinkingText)
+                    existing.Text = string.IsNullOrEmpty(text) ? ThinkingText : text;
                 existing.Streaming = true;
                 Changed?.Invoke(this, EventArgs.Empty);
                 return;
@@ -74,13 +76,15 @@ public sealed class ChatService
             var root = BaseId(requestId);
 
             // Muse streams follow-ups with the callback id ({id}-r2, -r3, ...)
-            // while the bubble was opened with the original id. Match on the
-            // conversation root first, then fall back to the newest open bubble
-            // so a missing/unknown id never spawns a stray message.
+            // while the bubble was opened with the original id. Only use the
+            // unqualified fallback when no id was supplied: a chunk with an
+            // unknown id must not be appended to another conversation.
             var target = Messages.LastOrDefault(m =>
                 m.Role == "muse" && m.Streaming &&
                 (string.IsNullOrEmpty(root) || BaseId(m.RequestId) == root || m.RequestId == requestId))
-                ?? Messages.LastOrDefault(m => m.Role == "muse" && m.Streaming);
+                ?? (string.IsNullOrEmpty(root)
+                    ? Messages.LastOrDefault(m => m.Role == "muse" && m.Streaming)
+                    : null);
 
             // A bare "Thinking..." payload is the indicator itself, not a
             // finished answer. Never close that bubble or the real text below
@@ -89,6 +93,9 @@ public sealed class ChatService
 
             if (target is null)
             {
+                // The documented final chunk is {"delta":"","done":true}; it
+                // must not create a blank message when no bubble is open.
+                if (done && string.IsNullOrEmpty(delta) && text is null) return;
                 var initial = delta ?? text ?? "";
                 Add("muse", string.IsNullOrEmpty(initial) && !done ? ThinkingText : initial,
                     requestId ?? "", !done || placeholderOnly, _museAvatar);

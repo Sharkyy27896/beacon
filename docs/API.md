@@ -186,7 +186,7 @@ and `durationMs`.
 {
   "ok": true,
   "service": "Beacon",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "listening": true,
   "address": "0.0.0.0:8765",
   "pending": 0,

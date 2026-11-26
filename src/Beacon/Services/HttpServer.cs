@@ -153,6 +153,16 @@ public sealed class HttpServer : IDisposable
 
         var headerText = Encoding.ASCII.GetString(ms.GetBuffer(), 0, headerEnd);
         var headers = ParseHeaders(headerText);
+
+        // A conforming client waits for this before sending the body.
+        if (headers.TryGetValue("Expect", out var expect) &&
+            expect.Contains("100-continue", StringComparison.OrdinalIgnoreCase))
+        {
+            var interim = Encoding.ASCII.GetBytes("HTTP/1.1 100 Continue\r\n\r\n");
+            await stream.WriteAsync(interim, 0, interim.Length, ct).ConfigureAwait(false);
+            await stream.FlushAsync(ct).ConfigureAwait(false);
+        }
+
         var chunked = headers.TryGetValue("Transfer-Encoding", out var te) &&
                       te.Contains("chunked", StringComparison.OrdinalIgnoreCase);
         var contentLength = 0;
@@ -266,7 +276,9 @@ public sealed class HttpServer : IDisposable
 
     private static string DecodeChunked(byte[] data, int offset)
     {
-        var sb = new StringBuilder();
+        // Decode once at the end: a UTF-8 sequence may be split across chunk
+        // boundaries, and per-chunk decoding would corrupt it.
+        using var body = new MemoryStream();
         var pos = offset;
         while (pos < data.Length)
         {
@@ -277,10 +289,10 @@ public sealed class HttpServer : IDisposable
                 break;
             pos = lineEnd + 2;
             if (pos + size > data.Length) break;
-            sb.Append(Encoding.UTF8.GetString(data, pos, size));
+            body.Write(data, pos, size);
             pos += size + 2;
         }
-        return sb.ToString();
+        return Encoding.UTF8.GetString(body.ToArray());
     }
 
     private static int IndexOfSequence(byte[] data, int start, string sequence)

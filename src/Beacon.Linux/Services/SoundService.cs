@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.Text;
+using System.Threading.Tasks;
 using Beacon.Models;
 
 namespace Beacon.Services;
@@ -77,13 +78,24 @@ public static class SoundService
             startInfo.ArgumentList.Add("--quiet");
             startInfo.ArgumentList.Add(path);
 
-            using var process = Process.Start(startInfo);
+            var process = Process.Start(startInfo);
             if (process is null) return false;
+            var stdout = process.StandardOutput.ReadToEndAsync();
+            var stderr = process.StandardError.ReadToEndAsync();
 
-            // Drain the pipes so a short-lived paplay never blocks on a full
-            // buffer, but do not wait for the audio device.
-            _ = process.StandardOutput.ReadToEndAsync();
-            _ = process.StandardError.ReadToEndAsync();
+            // Process.Start succeeding does not mean audio works: paplay can
+            // exit immediately when no PulseAudio server is available. Fall
+            // back to Canberra in that case; a still-playing process is fine.
+            if (process.WaitForExit(400))
+            {
+                var succeeded = process.ExitCode == 0;
+                _ = Task.WhenAll(stdout, stderr).ContinueWith(_ => process.Dispose(),
+                    TaskScheduler.Default);
+                return succeeded;
+            }
+
+            _ = Task.WhenAll(stdout, stderr).ContinueWith(_ => process.Dispose(),
+                TaskScheduler.Default);
             return true;
         }
         catch
@@ -122,11 +134,14 @@ public static class SoundService
             startInfo.ArgumentList.Add("-i");
             startInfo.ArgumentList.Add(eventName);
 
-            using var process = Process.Start(startInfo);
+            var process = Process.Start(startInfo);
             if (process is null) return;
-
-            _ = process.StandardOutput.ReadToEndAsync();
-            _ = process.StandardError.ReadToEndAsync();
+            var stdout = process.StandardOutput.ReadToEndAsync();
+            var stderr = process.StandardError.ReadToEndAsync();
+            // Dispose only after the redirected readers finish; disposing early
+            // faults the unobserved drain tasks and pollutes error.log.
+            _ = Task.WhenAll(stdout, stderr).ContinueWith(_ => process.Dispose(),
+                TaskScheduler.Default);
         }
         catch
         {

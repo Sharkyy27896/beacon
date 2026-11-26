@@ -12,6 +12,13 @@ $payloadZip = Join-Path $payloadDir 'BeaconPayload.zip'
 $installerOut = Join-Path $root 'publish\Installer'
 $finalExe = Join-Path $root 'Beacon-Setup.exe'
 
+# dotnet publish does not clean -o, so remove prior outputs before packing the
+# payload. Otherwise files deleted in a new version survive into the installer.
+foreach ($dir in @($publishDir, $installerOut)) {
+  if (Test-Path -LiteralPath $dir) { Remove-Item -LiteralPath $dir -Recurse -Force }
+}
+if (Test-Path -LiteralPath $finalExe) { Remove-Item -LiteralPath $finalExe -Force }
+
 # 1. Publish the app. Its assembly metadata is the version the installer reports.
 & $dotnet publish (Join-Path $root 'src\Beacon\Beacon.csproj') `
     -c Release -r win-x64 --self-contained true -o $publishDir --nologo

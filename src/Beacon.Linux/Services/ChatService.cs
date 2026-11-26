@@ -44,7 +44,9 @@ public sealed class ChatService
 
             if (existing is not null)
             {
-                existing.Text = string.IsNullOrEmpty(text) ? ThinkingText : text;
+                // Keep any partial answer; a second reply must not reset it.
+                if (string.IsNullOrEmpty(existing.Text) || existing.Text == ThinkingText)
+                    existing.Text = string.IsNullOrEmpty(text) ? ThinkingText : text;
                 existing.Streaming = true;
                 Changed?.Invoke(this, EventArgs.Empty);
                 return;
@@ -62,12 +64,16 @@ public sealed class ChatService
             var target = Messages.LastOrDefault(m =>
                 m.Role == "muse" && m.Streaming &&
                 (string.IsNullOrEmpty(root) || BaseId(m.RequestId) == root || m.RequestId == requestId))
-                ?? Messages.LastOrDefault(m => m.Role == "muse" && m.Streaming);
+                ?? (string.IsNullOrEmpty(root)
+                    ? Messages.LastOrDefault(m => m.Role == "muse" && m.Streaming)
+                    : null);
 
             var placeholderOnly = delta is null && text == ThinkingText;
 
             if (target is null)
             {
+                // {"delta":"","done":true} is a terminator, not a message.
+                if (done && string.IsNullOrEmpty(delta) && text is null) return;
                 var initial = delta ?? text ?? "";
                 Add("muse", string.IsNullOrEmpty(initial) && !done ? ThinkingText : initial,
                     requestId ?? "", !done || placeholderOnly, _museAvatar);
